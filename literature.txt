@@ -1,0 +1,52 @@
+the (hopefully soon) gigantic literature list for solving games with algorithms
+
+===============================================================================
+DETERMINISTIC SOLITAIRE GAMES
+
+Discrete deterministic one-player games
+-------------------------------------------------------------------------------
+Finding optimal solutions to Atomix (Hüffner, Edelkamp, Fernau, Niedermeier,
+2001)
+
+Description of a variant of A* used to find optimal solutions to Atomix.
+
+description of a* heuristics used for atomix
+
+Explanation of A* and IDA*, including tips on how to avoid expanding the same
+position multiple times.
+
+explanation of partial ida*, which is ida* with bitstate hashing as
+transposition table 
+
+===============================================================================
+DETERMINISTIC SOLITAIRE GAMES-computational complexity results
+-------------------------------------------------------------------------------
+
+===============================================================================
+SOLITAIRE GAMES WITH CHANCE
+
+Discrete one-player games with randomness
+-------------------------------------------------------------------------------
+
+
+===============================================================================
+VIDEO GAMES-computational complexity results
+-------------------------------------------------------------------------------
+
+
+===============================================================================
+SOLITAIRE GAMES WITH CHANCE-computational complexity results
+-------------------------------------------------------------------------------
+2048 is (PSPACE) hard, but sometimes easy (Rahul Mehta, 2014)
+
+Generalised 2048 is shown to be PSPACE-complete, by reduction from
+nondeterministic constraint logic.
+
+
+===============================================================================
+2-PLAYER GAMES WITH PERFECT INFORMATION
+-------------------------------------------------------------------------------
+
+===============================================================================
+MULTIPLAYER GAMES WITH HIDDEN INFORMATION AND/OR CHANCE
+-------------------------------------------------------------------------------
