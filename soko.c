@@ -1,16 +1,21 @@
 /* sokoban for small-ish puzzles
    - state must fit in signed long long
    - simple version that doesn't check for dead states
-  file format:
-  - size x y: set level size
-  - map: followed by y lines with map data
-    - #: wall
-    -  : floor
-    - @: man
-    - $: block
-    - .: destination
-    - *: block starting on destination
-    - +: man starting on destination
+   usage:
+   - read puzzle from standard input
+   file format:
+   - size x y: set level size
+   - map: followed by y lines with map data
+     - #: wall
+     -  : floor
+     - @: man
+     - $: block
+     - .: destination
+     - *: block starting on destination
+     - +: man starting on destination
+   state encoding:
+   - base (number of floor cells) number where least significant digit is man
+     position and the remaining digits are block positions
 */
 
 #include <stdio.h>
@@ -110,7 +115,7 @@ void domain_init() {
 	for(i=0;i<=info.blocks;i++) dsize*=info.floor,info.dsize*=info.floor;
 	if(dsize>9223372036854775807LL) error("state space too large");
 	for(i=8;i;i--) if(((info.dsize>>((i-1)*8))&255)) { info.slen=i; break; }
-	printf("loaded sokoban puzzle, state space %I64d\n",info.dsize);
+	printf("loaded sokoban puzzle, state space %lld\n",info.dsize);
 }
 
 unsigned char *domain_size() {

@@ -19,6 +19,33 @@ explanation of partial ida*, which is ida* with bitstate hashing as
 transposition table 
 
 ===============================================================================
+DETERMINISTIC SOLITAIRE GAMES-15-puzzle
+-------------------------------------------------------------------------------
+
+===============================================================================
+DETERMINISTIC SOLITAIRE GAMES-sokoban
+-------------------------------------------------------------------------------
+Pushing the limits: New developments in single-agent search (Andreas Junghanns,
+1999) [PhD thesis]
+
+Very thorough description of finding push-optimal Sokoban puzzles with IDA*.
+Domain-specific optimizations are described, such as deadlock detection,
+tunnel/goal macros, and move ordering based on relevance. In addition, over-
+estimation is tried (which breaks optimality). The program manages to solve
+56 out of 90 puzzles from xsokoban.
+-------------------------------------------------------------------------------
+Single-player games: introduction to a new solving method combining state-space
+modelling with a multi-agent representation (Francois Van Lishout, Pascal
+Gribomont, 2006)
+
+A subclass of Sokoban problems is defined: a problem belongs to this subclass
+if it is solvable by moving stones one by one. A simple algorithm to solve
+problems of this subclass is given. Then, classical IDA* is run, and goal
+states are defined as states in the subclass. The algorithm is able
+to solve 9 out of 90 problems from xsokoban. An algorithm that tests for
+subclass membership is not given.
+
+===============================================================================
 DETERMINISTIC SOLITAIRE GAMES-computational complexity results
 -------------------------------------------------------------------------------
 
@@ -50,3 +77,9 @@ nondeterministic constraint logic.
 ===============================================================================
 MULTIPLAYER GAMES WITH HIDDEN INFORMATION AND/OR CHANCE
 -------------------------------------------------------------------------------
+
+===============================================================================
+add sections for useful subroutines
+- permutation rank/unrank
+- stat space compression, various algorithms like vbyte compression,
+  pfor-delta etc, look at compression of inversed indexes

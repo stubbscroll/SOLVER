@@ -1,5 +1,4 @@
 # level 1 of the original sokoban
-# this level is too large for soko.c
 size 19 11
 map
 ###################

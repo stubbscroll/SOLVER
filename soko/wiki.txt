@@ -1,0 +1,12 @@
+# screenshot puzzle from wikipedia article
+size 8 9
+map
+########
+###   ##
+#.@$  ##
+### $.##
+#.##$ ##
+# # . ##
+#$ *$$.#
+#   .  #
+########

@@ -1,0 +1,17 @@
+# chip's challenge 1 level 132 mix up, upper right corner
+# solution is probably not transferrable to cc1 since we clog up a goal area
+# rather than explode bombs
+size 11 12
+map
+###########
+####......#
+########..#
+#  $    ..#
+#  ##$##  #
+#  #     ##
+##$#  # $ #
+#   # $ # #
+#  $  $ $ #
+## $ #$## #
+##@#      #
+###########

@@ -86,7 +86,7 @@ static void solver_bfs() {
 	while(bfs.qs<bfs.qe) {
 		decode_state(getptr(bfs.cur=bfs.q[bfs.qs]));
 		bfs.qs++; if(bfs.qs==bfs.n) bfs.qs=0;
-		if(bfs.qs%1000==0) printf("processed %lld states, %lld in queue\n",bfs.qs,bfs.qe-bfs.qs);
+		if(bfs.qs%100000==0) printf("processed %lld states, %lld in queue\n",bfs.qs,bfs.qe-bfs.qs);
 		visit_neighbours();
 	}
 }
