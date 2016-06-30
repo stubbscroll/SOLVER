@@ -39,17 +39,18 @@
 #include <math.h>
 #include "solver.h"
 
-#define MAX 20
+#define MAX 33
 
-/* can use __int128_t for compilers that support it for even larger puzzles */
-typedef long long statetype;
+/* can use __uint128_t for compilers that support it for even larger puzzles */
+typedef unsigned long long statetype;
 
 static int dx[]={1,0,-1,0};
 static int dy[]={0,1,0,-1};
 
 /* static info about instance */
 static struct static_s {
-	char smap[MAX][MAX]; /* map showing walls (#), goals (.) and dead cells (d) */
+	char smap[MAX][MAX]; /* map showing walls (#), goals (.), floor ( ),
+	                        dead cells (d) */
 	int idmap[MAX][MAX]; /* floor id, [0, floor-1], -1 if non-floor */
 	int id2map[MAX][MAX];/* floor id, [0, lfloor-1], non-dead floor only */
 	int idx[MAX*MAX];    /* reverse id map */
@@ -74,7 +75,7 @@ static void error(char *s) { puts(s); exit(1); }
 static statetype getval(unsigned char *p) {
 	statetype n=0;
 	int i;
-	for(i=0;i<info.slen;i++) n+=p[i]<<(i*8);
+	for(i=0;i<info.slen;i++) n+=((statetype)p[i])<<(i*8);
 	return n;
 }
 
@@ -93,12 +94,12 @@ static unsigned char *getptr(statetype v) {
    - multiset[] is the permutation
    - plen is the length of the permutation
    rank: set all of these
-   unrank: set counts, the rest
+   unrank: set counts and plen, multiset is returned
 */
 /* warning, these routines are not general multinomial routines. there's a lot
    of hardcoded stuff for this domain */
 
-#define MAXPASCAL 512
+#define MAXPASCAL 1025
 static statetype pas[MAXPASCAL][MAXPASCAL];
 static int counts[2];                      /* only floor and block */
 static int multiset[MAX*MAX];              /* current board string (permutation) */
@@ -158,7 +159,7 @@ static double doublenck(int n,int k) {
 static void deadsearch() {
 	static int q[MAX*MAX*2];
 	int qs=0,qe=0,i,j,cx,cy,x2,y2,x3,y3,d;
-	/* start search at goal cells and all reachable cells with backwards moves
+	/* start search at goal cells, all reachable cells with backwards moves
 	   are marked as non-dead, the rest are dead */
 	for(i=0;i<info.x;i++) for(j=0;j<info.y;j++) if(info.smap[i][j]=='.') q[qe++]=i,q[qe++]=j;
 	while(qs<qe) {
@@ -190,6 +191,7 @@ void domain_init() {
 	memset(cur.map,0,sizeof(cur.map));
 	while(fgets(s,998,stdin)) {
 		if(s[0]=='#') continue; /* non-map line starting with #: comment */
+		if(s[0]==13 || s[0]==10) continue; /* blank line */
 		sscanf(s,"%98s",t);
 		if(!strcmp(t,"size")) {
 			if(2!=sscanf(s,"size %d %d",&info.x,&info.y)) error("wrong parameters for size");
@@ -206,7 +208,7 @@ void domain_init() {
 					else if(c=='*') info.smap[i][j]='.',cur.map[i][j]='$';
 					else if(c=='@') info.smap[i][j]='d',cur.map[i][j]='@';
 					else if(c=='+') info.smap[i][j]='.',cur.map[i][j]='@';
-					else error("illegal char");
+					else printf("illegal char %d\n",c),exit(1);
 				}
 			}
 		}
@@ -381,7 +383,7 @@ void visit_neighbours() {
 	for(i=0;i<info.x;i++) for(j=0;j<info.y;j++) if(cur.map[i][j]=='@') cx=i,cy=j;
 	for(d=0;d<4;d++) {
 		x2=cx+dx[d]; y2=cy+dy[d];
-		if(x2<0 || y2<0 || x2>=info.x || y2>=info.x || info.smap[x2][y2]=='#') continue;
+		if(x2<0 || y2<0 || x2>=info.x || y2>=info.y || info.smap[x2][y2]=='#') continue;
 		if(cur.map[x2][y2]==' ') {
 			/* move man */
 			cur.map[cx][cy]=' ';
@@ -391,7 +393,7 @@ void visit_neighbours() {
 			cur.map[x2][y2]=' ';
 		} else if(cur.map[x2][y2]=='$') {
 			x3=x2+dx[d]; y3=y2+dy[d];
-			if(x3<0 || y3<0 || x3>=info.x || y3>=info.x || info.smap[x3][y3]=='#' || cur.map[x3][y3]!=' ') continue;
+			if(x3<0 || y3<0 || x3>=info.x || y3>=info.y || info.smap[x3][y3]=='#' || info.smap[x3][y3]=='d' || cur.map[x3][y3]!=' ') continue;
 			/* push block */
 			cur.map[cx][cy]=' ';
 			cur.map[x2][y2]='@';

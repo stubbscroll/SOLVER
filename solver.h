@@ -1,6 +1,17 @@
 #ifndef _SOLVER_H
 #define _SOLVER_H
 
+#ifdef __MINGW64__
+	#define LONG "%I64d"
+	#define ULONG "%I64u"
+#elif defined (_MSC_VER)
+	#define LONG "%I64d"
+	#define ULONG "%I64u"
+#else
+	#define LONG "%lld"
+	#define ULONG "%llu"
+#endif
+
 /* contract
    - never assume that the pointers to encoded states are valid after new calls
      to anywhere! make a local copy if needed

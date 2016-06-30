@@ -1,5 +1,5 @@
 /* sokoban for small-ish puzzles
-   - state must fit in signed long long
+   - state must fit in unsigned long long
    - simple version that doesn't check for dead states
    usage:
    - read puzzle from standard input
@@ -37,7 +37,7 @@ static struct static_s {
 	int x,y;             /* map size */
 	int blocks;          /* number of blocks (and elements in id-map) */
 	int floor;           /* number of floor */
-	long long dsize;     /* domain size (number of states) */
+	unsigned long long dsize; /* domain size (number of states) */
 	int slen;            /* number of bytes in state */
 } info;
 
@@ -47,16 +47,16 @@ static struct state_s {
 
 static void error(char *s) { puts(s); exit(1); }
 
-/* convert pointer-thing to long long */
-static long long getval(unsigned char *p) {
-	long long n=0;
+/* convert pointer-thing to unsigned long long */
+static unsigned long long getval(unsigned char *p) {
+	unsigned long long n=0;
 	int i;
-	for(i=0;i<info.slen;i++) n+=p[i]<<(i*8);
+	for(i=0;i<info.slen;i++) n+=((unsigned long long)p[i])<<(i*8);
 	return n;
 }
 
-/* convert long long to pointer-thing */
-static unsigned char *getptr(long long v) {
+/* convert unsigned long long to pointer-thing */
+static unsigned char *getptr(unsigned long long v) {
 	static unsigned char p[8];
 	int i;
 	for(i=0;i<info.slen;i++) p[i]=v&255,v>>=8;
@@ -136,7 +136,7 @@ void print_state() {
 }
 
 unsigned char *encode_state() {
-	long long v=0;
+	unsigned long long v=0;
 	int i,j;
 	for(i=0;i<info.x;i++) for(j=0;j<info.y;j++) if(cur.map[i][j]=='$') v=v*info.floor+info.idmap[i][j];
 	for(i=0;i<info.x;i++) for(j=0;j<info.y;j++) if(cur.map[i][j]=='@') v=v*info.floor+info.idmap[i][j];
@@ -144,7 +144,7 @@ unsigned char *encode_state() {
 }
 
 void decode_state(unsigned char *p) {
-	long long v=getval(p);
+	unsigned long long v=getval(p);
 	int i,w;
 	/* clear map */
 	for(i=0;i<info.floor;i++) cur.map[info.idx[i]][info.idy[i]]=' ';
@@ -170,7 +170,7 @@ void visit_neighbours() {
 	for(i=0;i<info.x;i++) for(j=0;j<info.y;j++) if(cur.map[i][j]=='@') cx=i,cy=j;
 	for(d=0;d<4;d++) {
 		x2=cx+dx[d]; y2=cy+dy[d];
-		if(x2<0 || y2<0 || x2>=info.x || y2>=info.x || info.smap[x2][y2]=='#') continue;
+		if(x2<0 || y2<0 || x2>=info.x || y2>=info.y || info.smap[x2][y2]=='#') continue;
 		if(cur.map[x2][y2]==' ') {
 			/* move man */
 			cur.map[cx][cy]=' ';
@@ -180,7 +180,7 @@ void visit_neighbours() {
 			cur.map[x2][y2]=' ';
 		} else if(cur.map[x2][y2]=='$') {
 			x3=x2+dx[d]; y3=y2+dy[d];
-			if(x3<0 || y3<0 || x3>=info.x || y3>=info.x || info.smap[x3][y3]=='#' || cur.map[x3][y3]!=' ') continue;
+			if(x3<0 || y3<0 || x3>=info.x || y3>=info.y || info.smap[x3][y3]=='#' || cur.map[x3][y3]!=' ') continue;
 			/* push block */
 			cur.map[cx][cy]=' ';
 			cur.map[x2][y2]='@';

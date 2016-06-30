@@ -1,1 +1,1 @@
-gcc -o soko-bfs.exe bfs.c soko2.c -O3 -Wall -std=c99
+gcc -o soko-bfs.exe bfsdu.c npuzzle.c -O3 -Wall -std=c99

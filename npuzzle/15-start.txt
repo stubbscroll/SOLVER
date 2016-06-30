@@ -1,0 +1,7 @@
+# start state of 15-puzzle
+size 4 4
+map
+1234
+5678
+9ABC
+DEF 

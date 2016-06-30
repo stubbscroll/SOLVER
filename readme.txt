@@ -7,8 +7,12 @@ generator and make it easier to try different algorithms on different domains.
 
 algorithms implemented:
 - bfs - simple breadth-first search
+- bfsd - bfs with delayed duplicate detection (TODO)
+- bfsdu - bfs (for undirected graphs) with delayed duplicate detection (in
+          progress)
 
 domains implemented:
+- npuzzle - (mn-1)-puzzle (aka 15-puzzle)
 - soko - simple sokoban, no checking for dead states etc
 - soko2 - sokoban, checks for simple deadlocks, better encoding
 

@@ -1,0 +1,8 @@
+# start state of 24-puzzle
+size 5 5
+map
+12345
+6789A
+BCDEF
+GHIJK
+LMNO 

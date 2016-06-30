@@ -1,0 +1,6 @@
+# example of non-square puzzle
+size 4 3
+map
+1234
+5678
+9AB 

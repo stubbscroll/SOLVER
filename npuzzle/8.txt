@@ -1,0 +1,6 @@
+# sample 8-puzzle
+size 3 3
+map
+876
+543
+21 
