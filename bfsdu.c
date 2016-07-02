@@ -4,8 +4,8 @@
      sufficient for duplicate checking)
    - delayed duplicate detection: check for duplicates in batches - after we
      generate all moves from an iteration or we run out of memory. more
-     efficient since we only need one linear scan of previous iterations per
-     batch
+     efficient since we only need one linear scan of each previous iteration
+     per batch
    - store states explicitly, sort states within each iteration
    - no size restriction on state size
    - search gives up when the two previous iterations + iteration under
@@ -29,12 +29,22 @@ static struct bfs_s {
 	long long curnn;              /* number of processed (duplicate-checked) states in current iteration */
 	long long curin;              /* number of unprocessed states in current iteration */
 	long long curcs;              /* start of unprocessed part of current iteration */
+
+	int repack;                   /* number of repacks done */
 	
 	int iter;                     /* number of iterations done */
 	long long tot;                /* total number of positions visited */
 	
 	int slen;                     /* length of state in bytes */
 } bfs;
+
+static void hexchar(int x){
+	if(x<10) printf("%d",x);
+	else printf("%c",'A'+x-10);
+}
+static void printhex(int x) {
+	hexchar(x/16); hexchar(x&15);
+}
 
 static void error(char *s) { puts(s); exit(1); }
 
@@ -48,6 +58,8 @@ void solver_init() {
 	bfs.prevprevs=bfs.prevpreve=bfs.prevprevn=0;
 	bfs.curs=bfs.cure=bfs.curn=0;
 	bfs.iter=0;
+	bfs.tot=1; /* start state */
+	bfs.repack=0;
 }
 
 /* copy pos, needs addresses! */
@@ -97,46 +109,78 @@ static long long removeduplicates2(long long prevprevs,long long prevprevn,long 
 	return curto;
 }
 
+static void printrawstate(unsigned char *p) {
+	for(int i=0;i<bfs.slen;i++) printhex(p[i]),printf(" ");printf("\n");
+}
+
 void add_child(unsigned char *p) {
 	if(bfs.cure==bfs.blen) {
-		/* early repack */
-		error("TODO repack stuff");
+		/* current generation too large, repack */
+		bfs.curin=sortandcompress(bfs.curcs,bfs.curin);
+		bfs.curin=removeduplicates2(bfs.prevprevs,bfs.prevprevn,bfs.prevs,bfs.prevn,bfs.curcs,bfs.curin);
+		/* sort together old repacked and new repacked */
+		/* TODO merge is sufficient, but it needs to be in-place */
+		if(bfs.repack) bfs.curnn=sortandcompress(bfs.curs,bfs.curin+bfs.curnn);
+		else bfs.curnn=bfs.curin;
+		bfs.curin=0;
+		bfs.cure=bfs.curcs=bfs.curs+bfs.curnn*bfs.slen;
+		bfs.repack++;
+		if(bfs.cure+bfs.slen>bfs.blen) {
+			printf("memory full after %d repacks\n",bfs.repack);
+			error("out of memory");
+		}
 	}
-	printf("  FOUND NEW STATE %I64d\n",bfs.cure);
-	print_state();
+//	printf("  FOUND NEW STATE %I64d: ",bfs.cure);
+//	printrawstate(p);
+//	print_state();
 	copypos(bfs.b+bfs.cure,p);
 	bfs.cure+=bfs.slen;
 	bfs.curin++;
+}
+
+static void printqueue() {
+	long long i;
+	for(i=0;i<bfs.prevpreve;i+=bfs.slen) printf("prevprev %6I64d: ",i),printrawstate(bfs.b+i);
+	for(;i<bfs.preve;i+=bfs.slen) printf("prev     %6I64d: ",i),printrawstate(bfs.b+i);
+	for(;i<bfs.cure;i+=bfs.slen) printf("cur      %6I64d: ",i),printrawstate(bfs.b+i);
 }
 
 void solver_bfs() {
 	long long at;
 	/* insert initial position into previous iteration */
 	copypos(bfs.b,encode_state());
-	bfs.preve=bfs.curs=bfs.cure=bfs.slen;
+	bfs.curcs=bfs.preve=bfs.curs=bfs.cure=bfs.slen;
 	bfs.prevn=1;
 	while(bfs.prevn) {
+		if(bfs.repack) printf("[%d] ",bfs.repack),bfs.repack=0;
 		printf("%d: q "LONG" tot "LONG"\n",bfs.iter,bfs.prevn,bfs.tot);
 		for(bfs.curnn=bfs.curin=0,at=bfs.prevs;at<bfs.preve;at+=bfs.slen) {
 			decode_state(bfs.b+at);
-			printf("unpack at %I64d\n",at);
-			print_state();
+//			printf("POP FROM %I64d: ",at);
+//			printrawstate(bfs.b+at);
+//			print_state();
 			visit_neighbours();
 		}
 		/* sort current iteration and remove duplicates within the iteration */
-		/* up to this point, only curin and curnn are set */
+		/* up to this point, only cure, curin and curnn are set (not curn) */
+//		puts("QUEUE before dupl");printqueue();
 		bfs.curn=sortandcompress(bfs.curs,bfs.curnn+bfs.curin);
+		bfs.cure=bfs.curs+bfs.curn*bfs.slen;
+//		puts("QUEUE after sort");printqueue();
 		/* remove duplicates against prev and prevprev */
 		bfs.curn=removeduplicates2(bfs.prevprevs,bfs.prevprevn,bfs.prevs,bfs.prevn,bfs.curs,bfs.curn);
+		bfs.cure=bfs.curs+bfs.curn*bfs.slen;
+//		puts("QUEUE after dupl");printqueue();
 		/* copy prev+cur to start of area */
 		memcpy(bfs.b,bfs.b+bfs.prevs,(bfs.prevn+bfs.curn)*bfs.slen);
 		/* set counts */
 		bfs.prevprevn=bfs.prevn; bfs.prevn=bfs.curn;
 		/* set pointers based on counts */
 		bfs.prevs=bfs.prevpreve=bfs.prevprevn*bfs.slen;
-		bfs.preve=bfs.curs=bfs.prevs+bfs.prevn*bfs.slen;
+		bfs.preve=bfs.curcs=bfs.curs=bfs.cure=bfs.prevs+bfs.prevn*bfs.slen;
 		bfs.tot+=bfs.curn;
 		bfs.iter++;
+//		puts("QUEUE after iter-stuff");printqueue();
 	}
 }
 

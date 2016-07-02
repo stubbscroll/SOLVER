@@ -21,6 +21,7 @@ transposition table
 ===============================================================================
 DETERMINISTIC SOLITAIRE GAMES-15-puzzle
 -------------------------------------------------------------------------------
+Large-scale parallel breadth-first search (Korf, Schultze, 2005)
 
 ===============================================================================
 DETERMINISTIC SOLITAIRE GAMES-sokoban
@@ -28,7 +29,7 @@ DETERMINISTIC SOLITAIRE GAMES-sokoban
 Pushing the limits: New developments in single-agent search (Andreas Junghanns,
 1999) [PhD thesis]
 
-Very thorough description of finding push-optimal Sokoban puzzles with IDA*.
+Very thorough description of finding push-optimal Sokoban solutions with IDA*.
 Domain-specific optimizations are described, such as deadlock detection,
 tunnel/goal macros, and move ordering based on relevance. In addition, over-
 estimation is tried (which breaks optimality). The program manages to solve

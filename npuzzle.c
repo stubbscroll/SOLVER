@@ -164,11 +164,11 @@ void print_state() {
 	putchar('\n');
 }
 
-void hexchar(int x){
+static void hexchar(int x){
 	if(x<10) printf("%d",x);
 	else printf("%c",'A'+x-10);
 }
-void printhex(int x) {
+static void printhex(int x) {
 	hexchar(x/16); hexchar(x&15);
 }
 
