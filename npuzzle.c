@@ -17,8 +17,9 @@
    state encoding:
    - permutation of numbers
    - TODO check if i can easily remove unsolvable states from mapping
-   - dunno if i should use naive lexicographic rank/unrank, O(n) variant, or
-     ruskey/myrvold. do some tests and pick the most well-behaving one
+   - dunno if i should use naive lexicographic rank/unrank, O(n) variant that
+     uses lots of memory, or ruskey/myrvold. do some tests and pick the most
+     well-behaving one
    - for O(n) time variant, consider using POPCNT if available, the speedup
      should be significant, and we can lift the puzzle size restriction
 */
@@ -203,7 +204,7 @@ void decode_state(unsigned char *p) {
 	long long taken=0;
 	for(k=j=0;j<info.y;j++) for(i=0;i<info.x;i++,k++) {
 		a=v/factorial[info.xy-k-1]; v%=factorial[info.xy-k-1];
-		/* find a-th 0 in taken */
+		/* find the a-th element not yet taken */
 		for(m=l=0;;m++) if(!(taken&(1LL<<m))) { l++; if(l>a) break; }
 		cur.map[i][j]=m;
 		taken|=1LL<<m;
@@ -212,7 +213,8 @@ void decode_state(unsigned char *p) {
 
 int won() {
 	int i,j,k;
-	if(!info.goal) return 0; /* never win */
+	/* enumerate entire tree mode, never win */
+	if(!info.goal) return 0;
 	for(k=j=0;j<info.y;j++) for(i=0;i<info.x;i++,k++) if(cur.map[i][j]!=(k+1)%info.xy) return 0;
 	return 1;
 }

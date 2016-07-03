@@ -30,11 +30,11 @@ static struct bfs_s {
 	long long curin;              /* number of unprocessed states in current iteration */
 	long long curcs;              /* start of unprocessed part of current iteration */
 
-	int repack;                   /* number of repacks done */
-	
+	int repack;                   /* number of repacks done in current iteration */
+
 	int iter;                     /* number of iterations done */
 	long long tot;                /* total number of positions visited */
-	
+
 	int slen;                     /* length of state in bytes */
 } bfs;
 
@@ -116,10 +116,27 @@ static void printrawstate(unsigned char *p) {
 void add_child(unsigned char *p) {
 	if(bfs.cure==bfs.blen) {
 		/* current generation too large, repack */
+		/* memory layout at this point:
+		   prevprevn states containing second last iteration
+		   prevn states containing last iteration
+		   curnn states containing sorted states of current iteration with duplicates
+		     from previous iterations removed
+		   curcs: index (in number of states) of first unsorted, un-duplicate-checked
+		     state
+		   curin: number of unsorted states
+		   repack: number of times we've repacked this iteration */
+		/* sort the unsorted states and remove duplicates */
 		bfs.curin=sortandcompress(bfs.curcs,bfs.curin);
+		/* remove states that are duplicates from previous iterations */
+		/* if the state graph is both undirected and bipartite (example: bricks with
+		   steps), we don't need to check against prev for duplicates! TODO include
+		   it later */
 		bfs.curin=removeduplicates2(bfs.prevprevs,bfs.prevprevn,bfs.prevs,bfs.prevn,bfs.curcs,bfs.curin);
-		/* sort together old repacked and new repacked */
-		/* TODO merge is sufficient, but it needs to be in-place */
+		/* sort states found since last repack into previously sorted chunk from
+		   current generation */
+		/* TODO merge is sufficient, but it needs to be in-place. i don't think sorting
+		   here increases the asymptotic runtime complexity of the complete program,
+		   though */
 		if(bfs.repack) bfs.curnn=sortandcompress(bfs.curs,bfs.curin+bfs.curnn);
 		else bfs.curnn=bfs.curin;
 		bfs.curin=0;
