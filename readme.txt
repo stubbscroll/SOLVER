@@ -7,13 +7,11 @@ generator and make it easier to try different algorithms on different domains.
 
 algorithms implemented:
 - bfs - simple breadth-first search (state space must fit in memory)
-- bfsd - bfs with delayed duplicate detection (TODO, pretty much bfsdu with
-         small changes)
-- bfsdu - bfs (for undirected graphs) with delayed duplicate detection (in
-          progress)
+- bfsd - bfs with delayed duplicate detection (in progress)
+- bfsdu - bfs (for undirected graphs) with delayed duplicate detection
 
 domains implemented:
-- npuzzle (undirected, bipartite?) - (mn-1)-puzzle (aka 15-puzzle)
+- npuzzle (undirected, bipartite) - (mn-1)-puzzle (aka 15-puzzle)
 - soko - simple sokoban, no checking for dead states etc
 - soko2 - sokoban, checks for simple deadlocks, better encoding
 
@@ -28,7 +26,7 @@ to come later:
 
 to compile (in windows):
 
-make.bat (edit the file to change algorithm and domain)
+make.bat
 
 to compile (in linux/macintosh etc):
 

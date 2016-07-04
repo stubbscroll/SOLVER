@@ -1,7 +1,10 @@
 /* bfs on undirected graph
-   - state graph must be undirected, so some domains will not work (sokoban)
+   - state graph must be undirected, so some domains will not work (like
+     sokoban)
    - store only previous 2 iterations + the one we're generating (this is
      sufficient for duplicate checking)
+   - as a consequence of the above, solution output is not currently supported.
+     this requires each iteration to be saved (for instance to disk)
    - delayed duplicate detection: check for duplicates in batches - after we
      generate all moves from an iteration or we run out of memory. more
      efficient since we only need one linear scan of each previous iteration
@@ -150,6 +153,10 @@ void add_child(unsigned char *p) {
 //	printf("  FOUND NEW STATE %I64d: ",bfs.cure);
 //	printrawstate(p);
 //	print_state();
+	if(won()) {
+		printf("we won in %d moves\n",bfs.iter+1);
+		error("output of solution not currently supported");
+	}
 	copypos(bfs.b+bfs.cure,p);
 	bfs.cure+=bfs.slen;
 	bfs.curin++;

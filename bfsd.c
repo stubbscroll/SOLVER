@@ -1,6 +1,8 @@
 /* improved version of bfs.c
-   - works on directed graphs
+   - supports directed graphs
    - store list of all visited states instead of marking them in array
+   - solution output is not currently supported, as no parent info is stored (to
+     save memory). storing each iteration separately will allow output
    - delayed duplicate detection: check for duplicates in batches - after we
      generate all moves from an iteration or we run out of memory. more efficient
      since we only need one linear scan of previously visited states per batch
@@ -130,6 +132,10 @@ void add_child(unsigned char *p) {
 		/* current generation too large, repack TODO */
 		error("TODO repack not yet implemented");
 	}
+	if(won()) {
+		printf("we won in %d moves\n",bfs.iter+1);
+		error("output of solution not currently supported");
+	}
 //	printf("  FOUND NEW STATE %I64d: ",bfs.cure);
 //	printrawstate(p);
 	copypos(bfs.b+bfs.cure,p);
@@ -183,6 +189,7 @@ void solver_bfs() {
 		bfs.iter++;
 //		puts("QUEUE after iter-stuff");printqueue();
 	}
+	puts("no solution found");
 }
 
 int main(int argc,char **argv) {

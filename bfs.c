@@ -29,7 +29,7 @@ static void error(char *s) { puts(s); exit(1); }
 static unsigned long long getval(unsigned char *p) {
 	unsigned long long n=0;
 	int i;
-	for(i=0;i<bfs.slen;i++) n+=p[i]<<(i*8);
+	for(i=0;i<bfs.slen;i++) n+=((unsigned long long)p[i])<<(i*8);
 	return n;
 }
 
