@@ -237,6 +237,8 @@ void domain_init() {
 	if(men!=1) error("map must contain 1 man");
 	if(goals!=info.blocks) error("map must contain same number of blocks and destinations");
 	if(!goals) error("map must contain at least 1 block");
+	for(i=0;i<info.x;i++) for(j=0;j<info.y;j++) if(cur.map[i][j]=='$' && info.id2map[i][j]<0)
+		error("illegal start config, block starts on dead space");
 	/* check size: #floors * (lfloor choose blocks) */
 	dsize=info.floor*doublenck(info.lfloor,info.blocks);
 	info.dsize=info.floor*pas[info.lfloor][info.blocks];
@@ -247,7 +249,7 @@ void domain_init() {
 }
 
 unsigned char *domain_size() {
-	return getptr(info.dsize);
+	return getptr(info.dsize-1);
 }
 
 int state_size() {

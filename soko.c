@@ -115,11 +115,11 @@ void domain_init() {
 	for(i=0;i<=info.blocks;i++) dsize*=info.floor,info.dsize*=info.floor;
 	if(dsize>9223372036854775807LL) error("state space too large");
 	for(i=8;i;i--) if(((info.dsize>>((i-1)*8))&255)) { info.slen=i; break; }
-	printf("loaded sokoban puzzle, state space %lld\n",info.dsize);
+	printf("loaded sokoban puzzle, state space "ULONG"\n",info.dsize);
 }
 
 unsigned char *domain_size() {
-	return getptr(info.dsize);
+	return getptr(info.dsize-1);
 }
 
 int state_size() {

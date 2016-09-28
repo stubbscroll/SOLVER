@@ -149,7 +149,7 @@ void domain_init() {
 }
 
 unsigned char *domain_size() {
-	return getptr(info.dsize);
+	return getptr(info.dsize-1);
 }
 
 int state_size() {

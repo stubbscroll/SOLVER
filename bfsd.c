@@ -8,8 +8,10 @@
      since we only need one linear scan of previously visited states per batch
    - store states explicitly, list of visited states is sorted
    - no size restriction on state size
-   - search gives up when the two previous iterations + iteration under
-     generation cannot all fit in memory
+   - search gives up when the list of all previous states + current iteration
+     (after duplicate check) cannot fit in memory
+   - the algorithm stores several lists of sorted states. when sorting, the
+     first byte is the least significant
    * implement in later versions: disk swapping, vbyte compression
 */
 
@@ -74,6 +76,7 @@ int comppos(const void *A,const void *B) {
 static long long sortandcompress(long long curs,long long curn) {
 	long long i,j;
 	long long ip,jp,p;
+	if(curn<1) return 0;
 	qsort(bfs.b+curs,curn,bfs.slen,comppos);
 	for(i=j=1,ip=jp=curs+bfs.slen,p=curs;i<curn;i++,ip+=bfs.slen) if(comppos(bfs.b+p,bfs.b+ip)) {
 		if(i!=j) copypos(bfs.b+jp,bfs.b+ip);
@@ -136,8 +139,7 @@ void add_child(unsigned char *p) {
 		printf("we won in %d moves\n",bfs.iter+1);
 		error("output of solution not currently supported");
 	}
-//	printf("  FOUND NEW STATE %I64d: ",bfs.cure);
-//	printrawstate(p);
+//	printf("  FOUND NEW STATE %I64d: ",bfs.cure);printrawstate(p);print_state();
 	copypos(bfs.b+bfs.cure,p);
 	bfs.cure+=bfs.slen;
 	bfs.curin++;
@@ -161,9 +163,7 @@ void solver_bfs() {
 		printf("%d: q "LONG" tot "LONG"\n",bfs.iter,bfs.prevn,bfs.tot);
 		for(bfs.curnn=bfs.curin=0,at=bfs.prevs;at<bfs.preve;at+=bfs.slen) {
 			decode_state(bfs.b+at);
-//			printf("POP FROM %I64d: ",at);
-//			printrawstate(bfs.b+at);
-//			print_state();
+//			printf("POP FROM %I64d: ",at);printrawstate(bfs.b+at);print_state();
 			visit_neighbours();
 		}
 		/* sort current iteration and remove duplicates within the iteration */

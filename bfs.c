@@ -46,10 +46,11 @@ static void solver_init() {
 	unsigned long long i;
 	bfs.slen=state_size();
 	if(bfs.slen>8) error("state size too large");
-	bfs.n=getval(domain_size());
-	if(bfs.n>=(1ULL<<60)-1) error("state space too large");
+	bfs.n=getval(domain_size())+1;
+	if(bfs.n==0 || bfs.n>=(1ULL<<60)-1) error("state space too large");
 	if(!(bfs.prev=malloc(bfs.n*sizeof(unsigned long long)))) error("out of memory allocating prev");
 	if(!(bfs.q=malloc(bfs.n*sizeof(unsigned long long)))) error("out of memory allocating q");
+	printf("states "LONG"\n",bfs.n);
 	for(i=0;i<bfs.n;i++) bfs.prev[i]=UNVISITED;
 }
 
@@ -88,7 +89,7 @@ static void solver_bfs() {
 	while(bfs.qs<bfs.qe) {
 		decode_state(getptr(bfs.cur=bfs.q[bfs.qs]));
 		bfs.qs++; if(bfs.qs==bfs.n) bfs.qs=0;
-		if(bfs.qs%100000==0) printf("processed %lld states, %lld in queue\n",bfs.qs,bfs.qe-bfs.qs);
+		if(bfs.qs%100000==0) printf("processed "ULONG" states, "ULONG" in queue\n",bfs.qs,bfs.qe-bfs.qs);
 		visit_neighbours();
 	}
 }
