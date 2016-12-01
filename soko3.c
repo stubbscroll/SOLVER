@@ -391,7 +391,7 @@ static int badnver(int x1,int y1,int d) {
 static int deadpos() {
 	int i,j;
 	/* check if blocks are on dead cells */
-	for(i=0;i<info.x;i++) for(j=0;j<info.y;j++) if(cur.map[i][j]=='$' && info.smap[i][j]=='#') return 1;
+//	for(i=0;i<info.x;i++) for(j=0;j<info.y;j++) if(cur.map[i][j]=='$' && info.smap[i][j]=='d') return 1;
 	/* check for 2x2 configurations of wall/block where >=1 block is not on goal */
 	for(i=0;i<info.x-1;i++) for(j=0;j<info.y-1;j++) if(bad2x2(i,j)) return 1;
 	for(i=0;i<info.x;i++) for(j=0;j<info.y;j++) {

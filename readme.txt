@@ -31,10 +31,12 @@ to come later:
   tight state encoding and delta compression is rather novel
 
 future work:
-- bfsd is rather slow, as it uses improvements created specifically for bfsdu.
-  find new improvements that are good for directed graphs. maybe delay the
-  delayed duplicate detection for several generations when the size of the
-  current generation is low compared to the number of all visited positions?
+- bfsd is rather slow, as it uses improvements created specifically for bfsdu,
+  and they are not a good fit for the case where we need to store all visited
+  positions. find new improvements that are good for directed graphs. maybe
+  delay the delayed duplicate detection for several generations when the size
+  of the current generation is low compared to the number of all visited
+  positions?
 
 to compile (in windows):
 

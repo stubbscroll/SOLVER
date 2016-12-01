@@ -1,3 +1,7 @@
+/* npuzzle.c: solver for generalized 15-puzzle
+   copyright (c) 2016 by stubbscroll, under the GNU general public license v3.
+   no warranty. see LICENSE.txt for details.
+*/
 /* n-puzzle solver (generalised 15-puzzle)
    - check parity of input and report if it is unsolvable
    - size limit: when number of states don't fit in statetype
