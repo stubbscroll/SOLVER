@@ -1,3 +1,8 @@
+/* bfsdu.c: breadth-first search with delayed duplicate detection for
+   undirected graphs
+   copyright (c) 2016 by stubbscroll, under the GNU general public license v3.
+   no warranty. see LICENSE.txt for details.
+*/
 /* bfs on undirected graph
    - state graph must be undirected, so some domains will not work (like
      sokoban)

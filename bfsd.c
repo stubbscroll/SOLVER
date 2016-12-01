@@ -1,3 +1,7 @@
+/* bfsd.c: breadth-first search with delayed duplicate detection
+   copyright (c) 2016 by stubbscroll, under the GNU general public license v3.
+   no warranty. see LICENSE.txt for details.
+*/
 /* improved version of bfs.c
    - supports directed graphs
    - store list of all visited states instead of marking them in array

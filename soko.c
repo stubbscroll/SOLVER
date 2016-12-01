@@ -1,3 +1,7 @@
+/* soko.c: simple sokoban solver
+   copyright (c) 2016 by stubbscroll, under the GNU general public license v3.
+   no warranty. see LICENSE.txt for details.
+*/
 /* sokoban for small-ish puzzles
    - state must fit in unsigned long long
    - simple version that doesn't check for dead states
@@ -5,6 +9,8 @@
    - read puzzle from standard input
    file format:
    - size x y: set level size
+   - goal x y: set man goal position (use if man goal overlaps with block
+     or starting position)
    - map: followed by y lines with map data
      - #: wall
      -  : floor
@@ -13,6 +19,9 @@
      - .: destination
      - *: block starting on destination
      - +: man starting on destination
+     - g: man goal
+   * there are two ways to define man goal. if it's not defined, the puzzle
+     is solved when all blocks are on destinations
    state encoding:
    - base (number of floor cells) number where least significant digit is man
      position and the remaining digits are block positions
@@ -35,6 +44,7 @@ static struct static_s {
 	int idx[MAX*MAX];    /* reverse id map */
 	int idy[MAX*MAX];
 	int x,y;             /* map size */
+	int goalx,goaly;     /* man goal */
 	int blocks;          /* number of blocks (and elements in id-map) */
 	int floor;           /* number of floor */
 	unsigned long long dsize; /* domain size (number of states) */
@@ -69,6 +79,7 @@ void domain_init() {
 	int i,j,men=0,goals=0;
 	double dsize;
 	info.x=info.y=0;
+	info.goalx=info.goaly=-1;
 	memset(info.smap,0,sizeof(info.smap));
 	memset(cur.map,0,sizeof(cur.map));
 	while(fgets(s,998,stdin)) {
@@ -77,6 +88,9 @@ void domain_init() {
 		if(!strcmp(t,"size")) {
 			if(2!=sscanf(s,"size %d %d",&info.x,&info.y)) error("wrong parameters for size");
 			if(info.x>MAX || info.y>MAX) error("map too large, increase MAX and recompile");
+		} else if(!strcmp(t,"goal")) {
+			if(2!=sscanf(s,"goal %d %d",&info.goalx,&info.goaly)) error("wrong parameters for goal");
+			if(info.goalx<0 || info.goaly<0 || info.goalx>=info.x || info.goaly>=info.y) error("man goal outside of map");
 		} else if(!strcmp(t,"map")) {
 			for(j=0;j<info.y;j++) {
 				if(!fgets(s,998,stdin)) error("map ended unexpectedly");
@@ -89,6 +103,7 @@ void domain_init() {
 					else if(c=='*') info.smap[i][j]='.',cur.map[i][j]='$';
 					else if(c=='@') info.smap[i][j]=' ',cur.map[i][j]='@';
 					else if(c=='+') info.smap[i][j]='.',cur.map[i][j]='@';
+					else if(c=='g') info.smap[i][j]=' ',cur.map[i][j]=' ',info.goalx=i,info.goaly=j;
 					else error("illegal char");
 				}
 			}
@@ -161,6 +176,7 @@ void decode_state(unsigned char *p) {
 int won() {
 	int i,j;
 	for(i=0;i<info.x;i++) for(j=0;j<info.y;j++) if(info.smap[i][j]=='.' && cur.map[i][j]!='$') return 0;
+	if(info.goalx>-1 && info.goaly>-1 && cur.map[info.goalx][info.goaly]!='@') return 0;
 	return 1;
 }
 

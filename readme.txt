@@ -14,15 +14,27 @@ domains implemented:
 - npuzzle (undirected, bipartite) - (mn-1)-puzzle (aka 15-puzzle)
 - soko - simple sokoban, no checking for dead states etc
 - soko2 - sokoban, checks for simple deadlocks, better encoding
+- soko3 - sokoban, same as soko2 but with block slapping (feature in chip's
+  challenge for lynx and steam)
+
+puzzle instances:
+- npuzzle/ - puzzles for n-puzzle
+- soko/ - puzzles for soko, soko2, soko3
 
 to come later:
-- more sophisticated versions of bfs, with delayed duplicate detection, vbyte
-  compression, disk swapping, special versions for undirected graphs
+- improved bfs: vbyte compression, disk swapping
 - a* (including sophisticated variants)
+- solution output for bfsd and bfsdu
 - more domains (eligible games are typically pspace-complete and usually
   involves finding a sequence of moves leading to a goal state)
-- maybe i'll write something, i think the combination of state space search and
-  vbyte compression is rather novel
+- maybe i'll write something, i think the combination of state space search,
+  tight state encoding and delta compression is rather novel
+
+future work:
+- bfsd is rather slow, as it uses improvements created specifically for bfsdu.
+  find new improvements that are good for directed graphs. maybe delay the
+  delayed duplicate detection for several generations when the size of the
+  current generation is low compared to the number of all visited positions?
 
 to compile (in windows):
 

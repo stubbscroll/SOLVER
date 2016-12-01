@@ -1,3 +1,7 @@
+/* solver.h: header file for graph search framework
+   copyright (c) 2016 by stubbscroll, under the GNU general public license v3.
+   no warranty. see LICENSE.txt for details.
+*/
 #ifndef _SOLVER_H
 #define _SOLVER_H
 
@@ -23,7 +27,8 @@
    current state */
 void domain_init();
 
-/* return state space size
+/* return state space size-1
+   the reason for -1 to be able to return state space sizes of 2^k
    byte 0 to n-1: number in little endian format (which is what my old vbyte
      solvers use)
    n is state_size() for the given instance */

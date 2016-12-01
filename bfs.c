@@ -1,3 +1,7 @@
+/* bfs.c: simple breadth-first search
+   copyright (c) 2016 by stubbscroll, under the GNU general public license v3.
+   no warranty. see LICENSE.txt for details.
+*/
 /* simple bfs:
    - supports directed graphs
    - number of states must fit in unsigned long long (minus 2 that are reserved
