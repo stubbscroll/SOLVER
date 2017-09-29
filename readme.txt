@@ -9,6 +9,8 @@ algorithms implemented:
 - bfs - simple breadth-first search (state space must fit in memory)
 - bfsd - bfs with delayed duplicate detection (in progress)
 - bfsdu - bfs (for undirected graphs) with delayed duplicate detection
+- bfs2 - breadth-first search with disk swapping (requires bitmask of state
+  space in memory)
 
 domains implemented:
 - npuzzle (undirected, bipartite) - (mn-1)-puzzle (aka 15-puzzle)
@@ -23,7 +25,9 @@ puzzle instances:
 
 to come later:
 - improved bfs: vbyte compression, disk swapping
-- a* (including sophisticated variants)
+- improve soko: add floor usable for man but not blocks. add another symbol for
+  man starting on such floor
+- a* (including sophisticated variants, see a certain paper on solving atomix)
 - solution output for bfsd and bfsdu
 - more domains (eligible games are typically pspace-complete and usually
   involves finding a sequence of moves leading to a goal state)

@@ -54,6 +54,10 @@ static struct bfs_s {
 	int slen;                          /* length of state in bytes */
 	int gen;                           /* iteration number */
 	long long tot;                     /* total number of states visited */
+
+	char outputmode;                   /* 0:normal search, 1:output solution */
+	char foundback;                    /* 1:found previous state in solution search */
+	unsigned long long outputstate;    /* state we're searching for */
 } bfs;
 
 static void error(char *s) { puts(s); exit(1); }
@@ -116,6 +120,7 @@ void solver_init() {
 	if(!(bfs.visited=calloc(bfs.visitedsize,1))) error("out of memory allocating state space bitmask");
 	if(!(bfs.b1=malloc(bfs.b1len))) error("out of memory allocating memory area 1");
 	if(!(bfs.b2=malloc(bfs.b2len))) error("out of memory allocating memory area 2");
+	bfs.outputmode=0;
 }
 
 void createnewgenfile(int gen) {
@@ -139,22 +144,64 @@ void flushcur() {
 	printf(".");
 }
 
-void add_child(unsigned char *p) {
-	unsigned long long state=getval(p);
-	if(ISVISITED(state)) return;
-	SETVISITED(state);
-	if(won()) {
-		printf("we won in %d moves\n",bfs.gen+1);
-		error("output of solution not currently supported");
+void showsolution() {
+	bfs.outputstate=getval(encode_state());
+	printf("we won! solution steps (in reverse):\n");
+	printf("move %d\n",bfs.gen+1);
+	print_state();
+	/* go through all iteration files in reverse order, do a reverse search to
+	   find actual states */
+	bfs.outputmode=1;
+	for(;bfs.gen>=0;bfs.gen--) {
+		char s[100];
+		sprintf(s,"GEN-%04d",bfs.gen);
+		long long len=filesize(s);
+		if(len<0) error("couldn't get file size of gen file");
+		FILE *f=fopen(s,"rb");
+		if(!f) error("couldn't open previous gen file");
+		while(len>0) {
+			long long grab=len<bfs.b1len?len:bfs.b1len;
+			long long got=fread(bfs.b1,1,grab,f);
+			if(got!=grab) error("read error");
+			len-=grab;
+			for(long long at=0;at<grab;at+=bfs.slen) {
+				decode_state(bfs.b1+at);
+				bfs.foundback=0;
+				visit_neighbours();
+				if(bfs.foundback) {
+					bfs.outputstate=getval(bfs.b1+at);
+					printf("move %d\n",bfs.gen);
+					decode_state(bfs.b1+at);
+					print_state();
+					goto gendone;
+				}
+			}
+		}
+	gendone:
+		fclose(f);
 	}
-	if(bfs.cure==bfs.b2len) flushcur();
-	copypos(bfs.b2+bfs.cure,p);
-	bfs.cure+=bfs.slen;
+	exit(0);
+}
+
+void add_child(unsigned char *p) {
+	if(!bfs.outputmode) {
+		unsigned long long state=getval(p);
+		if(ISVISITED(state)) return;
+		SETVISITED(state);
+		if(won()) showsolution();
+		if(bfs.cure==bfs.b2len) flushcur();
+		copypos(bfs.b2+bfs.cure,p);
+		bfs.cure+=bfs.slen;
+	} else if(bfs.outputmode && !bfs.foundback) {
+		unsigned long long state=getval(p);
+		if(state==bfs.outputstate) bfs.foundback=1;
+	}
 }
 
 void solver_bfs() {
 	/* save initial state to disk as iteration (generation) 0 */
 	copypos(bfs.b2,encode_state());
+	SETVISITED(getval(encode_state()));
 	bfs.cure=bfs.slen;
 	bfs.gen=-1;
 	createnewgenfile(0);

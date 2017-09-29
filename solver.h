@@ -25,34 +25,34 @@
 
 /* obtain instance to be searched, do necessary initialization and set as
    current state */
-void domain_init();
+void domain_init(void);
 
 /* return state space size-1
    the reason for -1 to be able to return state space sizes of 2^k
    byte 0 to n-1: number in little endian format (which is what my old vbyte
      solvers use)
    n is state_size() for the given instance */
-unsigned char *domain_size();
+unsigned char *domain_size(void);
 
 /* return size in bytes of encoded state */
-int state_size();
+int state_size(void);
 
 /* return encoded version of current state */
-unsigned char *encode_state();
+unsigned char *encode_state(void);
 
 /* decode given state and set as current state */
 void decode_state(unsigned char *);
 
 /* print current state */
-void print_state();
+void print_state(void);
 
 /* visit all neighbouring states from current state */
 /* it must call add_child(ptr) for each generated neighbour where ptr is the
    encoded state */
-void visit_neighbours();
+void visit_neighbours(void);
 
 /* return 1 if current state is a win state, 0 otherwise */
-int won();
+int won(void);
 
 /* TODO
    - a* heuristic (calculate distance to goal (no overestimate))

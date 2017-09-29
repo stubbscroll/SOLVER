@@ -131,7 +131,11 @@ static void printhex(int x) {
 	hexchar(x/16); hexchar(x&15);
 }
 static void printrawstate(unsigned char *p) {
-	for(int i=0;i<bfs.slen;i++) printhex(p[i]),printf(" ");printf("\n");
+	for(int i=0;i<bfs.slen;i++) {
+		printhex(p[i]);
+		printf(" ");
+	}
+	printf("\n");
 }
 
 void add_child(unsigned char *p) {
