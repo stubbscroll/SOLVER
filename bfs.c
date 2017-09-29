@@ -1,5 +1,6 @@
 /* bfs.c: simple breadth-first search
-   copyright (c) 2016 by stubbscroll, under the GNU general public license v3.
+   copyright (c) 2016-2017 by stubbscroll,
+   under the GNU general public license v3.
    no warranty. see LICENSE.txt for details.
 */
 /* simple bfs:

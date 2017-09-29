@@ -20,8 +20,10 @@
      - @: man
      - $: block
      - .: destination
+     - _: "dead cell" (cell where man can go, but not blocks)
      - *: block starting on destination
      - +: man starting on destination
+     - =: man starting on dead cell
      - g: man goal
    * there are two ways to define man goal. if it's not defined, the puzzle
      is solved when all blocks are on destinations
@@ -39,6 +41,9 @@
      gains of this method.
    - (the two systems have different size, so the shorter size can technically
      be considered to have a gap at the end of the range)
+   - TODO actually implement that man-position skips blocks! won't make the
+     faster, but the memory savings are significant for the solvers that keeps
+     all states in memory
    deadlock routines only subject to shallow testing, they seem to work
 */
 
@@ -177,12 +182,14 @@ static void deadsearch() {
 		for(d=0;d<4;d++) {
 			x2=cx+dx[d]; y2=cy+dy[d];
 			x3=x2+dx[d]; y3=y2+dy[d];
-			if(x3<0 || y3<0 || x3>=info.x || y3>=info.y || info.smap[x2][y2]=='#' || info.smap[x2][y2]=='.' || info.smap[x3][y3]=='#') continue;
+			if(x3<0 || y3<0 || x3>=info.x || y3>=info.y || info.smap[x2][y2]=='_' || info.smap[x2][y2]=='#' || info.smap[x2][y2]=='.' || info.smap[x3][y3]=='#') continue;
 			if(info.smap[x2][y2]==' ') continue;
 			info.smap[x2][y2]=' ';
 			q[qe++]=x2; q[qe++]=y2;
 		}
 	}
+	/* change cells from '_' to 'd' */
+	for(i=0;i<info.x;i++) for(j=0;j<info.y;j++) if(info.smap[i][j]=='_') info.smap[i][j]='d';
 }
 
 /* read input and populate info and cur */
@@ -219,16 +226,20 @@ void domain_init() {
 					else if(c==' ') info.smap[i][j]='d',cur.map[i][j]=' ';
 					else if(c=='.') info.smap[i][j]='.',cur.map[i][j]=' ';
 					else if(c=='$') info.smap[i][j]='d',cur.map[i][j]='$';
+					else if(c=='_') info.smap[i][j]='_',cur.map[i][j]=' ';
 					else if(c=='*') info.smap[i][j]='.',cur.map[i][j]='$';
 					else if(c=='@') info.smap[i][j]='d',cur.map[i][j]='@';
 					else if(c=='+') info.smap[i][j]='.',cur.map[i][j]='@';
+					else if(c=='=') info.smap[i][j]='_',cur.map[i][j]='@';
 					else if(c=='g') info.smap[i][j]='d',cur.map[i][j]=' ',info.goalx=i,info.goaly=j;
 					else printf("illegal char %d\n",c),exit(1);
 				}
 			}
 		}
 	}
-	/* find non-dead cells */
+	/* at this point, cells not yet determined as live or dead are marked with
+	   'd', while user-set dead cells are marked with '_' */
+	/* search for non-dead cells */
 	deadsearch();
 	/* generate id-map */
 	memset(info.idmap,-1,sizeof(info.idmap));
@@ -254,9 +265,9 @@ void domain_init() {
 	if(!goals) error("map must contain at least 1 block");
 	for(i=0;i<info.x;i++) for(j=0;j<info.y;j++) if(cur.map[i][j]=='$' && info.id2map[i][j]<0)
 		error("illegal start config, block starts on dead space");
-	/* check size: #floors * (lfloor choose blocks) */
-	dsize=info.floor*doublenck(info.lfloor,info.blocks);
-	info.dsize=info.floor*pas[info.lfloor][info.blocks];
+	/* check size: (#floors) * (lfloor choose blocks) */
+	dsize=(info.floor)*doublenck(info.lfloor,info.blocks);
+	info.dsize=(info.floor)*pas[info.lfloor][info.blocks];
 	/* if numbers went haywire, we overflowed */
 	if(fabs(dsize-info.dsize)/dsize>0.001) error("state space too large");
 	for(info.slen=0,z=info.dsize;z;info.slen++,z>>=8);
@@ -288,6 +299,8 @@ unsigned char *encode_state() {
 		v=info.idmap[i][j];
 		break;
 	}
+	/* TODO subtract number of blocks left/above of man from v */
+	/* TODO have 2 systems, depending on whether man is on dead or live cell */
 	/* generate permutation */
 	counts[0]=counts[1]=plen=0;
 	for(k=0;k<info.lfloor;k++) {
@@ -297,6 +310,7 @@ unsigned char *encode_state() {
 		else if(cur.map[i][j]==' ') counts[0]++,multiset[plen++]=0;
 		else if(cur.map[i][j]=='$') counts[1]++,multiset[plen++]=1;
 	}
+	/* TODO adjust for number of blocks */
 	v+=permrank()*info.floor;
 	return getptr(v);
 }

@@ -21,8 +21,10 @@
      - @: man
      - $: block
      - .: destination
+     - _: "dead cell" (cell where man can go, but not blocks)
      - *: block starting on destination
      - +: man starting on destination
+     - =: man starting on dead cell
      - g: goal position for man
    * there are two ways to define man goal, and it's optional. if it's not
      defined, the puzzle is solved when all blocks are on destinations
@@ -180,12 +182,14 @@ static void deadsearch() {
 		for(d=0;d<4;d++) {
 			x2=cx+dx[d]; y2=cy+dy[d];
 			x3=x2+dx[d]; y3=y2+dy[d];
-			if(x3<0 || y3<0 || x3>=info.x || y3>=info.y || info.smap[x2][y2]=='#' || info.smap[x2][y2]=='.' || info.smap[x3][y3]=='#') continue;
+			if(x3<0 || y3<0 || x3>=info.x || y3>=info.y || info.smap[x2][y2]=='_' || info.smap[x2][y2]=='#' || info.smap[x2][y2]=='.' || info.smap[x3][y3]=='#') continue;
 			if(info.smap[x2][y2]==' ') continue;
 			info.smap[x2][y2]=' ';
 			q[qe++]=x2; q[qe++]=y2;
 		}
 	}
+	/* change cells from '_' to 'd' */
+	for(i=0;i<info.x;i++) for(j=0;j<info.y;j++) if(info.smap[i][j]=='_') info.smap[i][j]='d';
 }
 
 /* read input and populate info and cur */
@@ -223,16 +227,20 @@ void domain_init() {
 					else if(c==' ') info.smap[i][j]='d',cur.map[i][j]=' ';
 					else if(c=='.') info.smap[i][j]='.',cur.map[i][j]=' ';
 					else if(c=='$') info.smap[i][j]='d',cur.map[i][j]='$';
+					else if(c=='_') info.smap[i][j]='_',cur.map[i][j]=' ';
 					else if(c=='*') info.smap[i][j]='.',cur.map[i][j]='$';
 					else if(c=='@') info.smap[i][j]='d',cur.map[i][j]='@';
 					else if(c=='+') info.smap[i][j]='.',cur.map[i][j]='@';
+					else if(c=='=') info.smap[i][j]='_',cur.map[i][j]='@';
 					else if(c=='g') info.smap[i][j]='d',cur.map[i][j]=' ',info.goalx=i,info.goaly=j;
 					else printf("illegal char %d\n",c),exit(1);
 				}
 			}
 		}
 	}
-	/* find non-dead cells */
+	/* at this point, cells not yet determined as live or dead are marked with
+	   'd', while user-set dead cells are marked with '_' */
+	/* search for non-dead cells */
 	deadsearch();
 	/* generate id-map */
 	memset(info.idmap,-1,sizeof(info.idmap));
@@ -258,10 +266,10 @@ void domain_init() {
 	if(!goals) error("map must contain at least 1 block");
 	for(i=0;i<info.x;i++) for(j=0;j<info.y;j++) if(cur.map[i][j]=='$' && info.id2map[i][j]<0)
 		error("illegal start config, block starts on dead space");
-	/* check size: #floors * (lfloor choose blocks) */
+	/* check size: (#floors) * (lfloor choose blocks) */
 	/* multiply by 5 for player dir */
-	dsize=5*info.floor*doublenck(info.lfloor,info.blocks);
-	info.dsize=5*info.floor*pas[info.lfloor][info.blocks];
+	dsize=5*(info.floor)*doublenck(info.lfloor,info.blocks);
+	info.dsize=5*(info.floor)*pas[info.lfloor][info.blocks];
 	/* if numbers went haywire, we overflowed */
 	if(fabs(dsize-info.dsize)/dsize>0.001) error("state space too large");
 	for(info.slen=0,z=info.dsize;z;info.slen++,z>>=8);

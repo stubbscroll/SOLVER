@@ -1,10 +1,12 @@
 /* soko.c: simple sokoban solver
-   copyright (c) 2016 by stubbscroll, under the GNU general public license v3.
+   copyright (c) 2016-2017 by stubbscroll,
+   under the GNU general public license v3.
    no warranty. see LICENSE.txt for details.
 */
 /* sokoban for small-ish puzzles
    - state must fit in unsigned long long
-   - simple version that doesn't check for dead states
+   - simple version that doesn't check for dead states (though the user can
+     define cells as such manually)
    usage:
    - read puzzle from standard input
    file format:
@@ -16,9 +18,11 @@
      -  : floor
      - @: man
      - $: block
+     - _: cell traversable by man, but not by block
      - .: destination
      - *: block starting on destination
      - +: man starting on destination
+     - =: man starting on man-only cell
      - g: man goal
    * there are two ways to define man goal. if it's not defined, the puzzle
      is solved when all blocks are on destinations
@@ -39,7 +43,7 @@ static int dy[]={0,1,0,-1};
 
 /* static info about instance */
 static struct static_s {
-	char smap[MAX][MAX]; /* map showing walls and goals */
+	char smap[MAX][MAX]; /* '#':map, ' ':floor, '_':dead cell */
 	int idmap[MAX][MAX]; /* floor id, [0, floor-1] */
 	int idx[MAX*MAX];    /* reverse id map */
 	int idy[MAX*MAX];
@@ -52,7 +56,7 @@ static struct static_s {
 } info;
 
 static struct state_s {
-	char map[MAX][MAX];
+	char map[MAX][MAX];  /* '$':block, '@':man, ' ':nothing */
 } cur;
 
 static void error(char *s) { puts(s); exit(1); }
@@ -100,9 +104,11 @@ void domain_init() {
 					else if(c==' ') info.smap[i][j]=' ',cur.map[i][j]=' ';
 					else if(c=='.') info.smap[i][j]='.',cur.map[i][j]=' ';
 					else if(c=='$') info.smap[i][j]=' ',cur.map[i][j]='$';
+					else if(c=='_') info.smap[i][j]='_',cur.map[i][j]=' ';
 					else if(c=='*') info.smap[i][j]='.',cur.map[i][j]='$';
 					else if(c=='@') info.smap[i][j]=' ',cur.map[i][j]='@';
 					else if(c=='+') info.smap[i][j]='.',cur.map[i][j]='@';
+					else if(c=='=') info.smap[i][j]='_',cur.map[i][j]='@';
 					else if(c=='g') info.smap[i][j]=' ',cur.map[i][j]=' ',info.goalx=i,info.goaly=j;
 					else error("illegal char");
 				}
@@ -113,7 +119,7 @@ void domain_init() {
 	memset(info.idmap,-1,sizeof(info.idmap));
 	info.floor=info.blocks=0;
 	for(i=0;i<info.x;i++) for(j=0;j<info.y;j++) {
-		if(info.smap[i][j]==' ' || info.smap[i][j]=='.') {
+		if(info.smap[i][j]==' ' || info.smap[i][j]=='.' || info.smap[i][j]=='_') {
 			info.idx[info.floor]=i;
 			info.idy[info.floor]=j;
 			info.idmap[i][j]=info.floor++;
@@ -144,7 +150,10 @@ int state_size() {
 void print_state() {
 	int i,j;
 	for(j=0;j<info.y;j++) {
-		for(i=0;i<info.x;i++) putchar(cur.map[i][j]);
+		for(i=0;i<info.x;i++) {
+			if(cur.map[i][j]==' ' && info.smap[i][j]=='_') putchar('_');
+			else putchar(cur.map[i][j]);
+		}
 		putchar('\n');
 	}
 	putchar('\n');
@@ -196,7 +205,7 @@ void visit_neighbours() {
 			cur.map[x2][y2]=' ';
 		} else if(cur.map[x2][y2]=='$') {
 			x3=x2+dx[d]; y3=y2+dy[d];
-			if(x3<0 || y3<0 || x3>=info.x || y3>=info.y || info.smap[x3][y3]=='#' || cur.map[x3][y3]!=' ') continue;
+			if(x3<0 || y3<0 || x3>=info.x || y3>=info.y || info.smap[x3][y3]=='#' || cur.map[x3][y3]!=' ' || info.smap[x3][y3]=='_') continue;
 			/* push block */
 			cur.map[cx][cy]=' ';
 			cur.map[x2][y2]='@';

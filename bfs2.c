@@ -6,13 +6,15 @@
    - supports directed graphs
    - need (#states/8) bytes for bitmask of visited states
    - store list of visited states for each iteration in lists that are flushed
-     to disk as needed
+     to disk as needed (all disk access is linear, should be fast on non-ssd)
    - duplicates are checked immediately against the bitmask
    - backward search used to reconstruct solution
-   - expected to be faster than bfsd
+   - faster than bfsd, while being able to search farther (given that we have
+     enough memory for the bitmask)
    * vbyte compression can be added for less space usage
    usage:
-   - solver a b < file.txt, where
+   - solver a b < file.txt OR
+     solver b < file.txt, where
      a is megabytes allocated for incoming states (can be small)
      b is megabytes allocated for outgoing states (huge is good)
      file.txt is the level to be solved
@@ -35,7 +37,6 @@
 	#include <time.h>
 #endif
 #include "solver.h"
-
 
 static struct bfs_s {
 	long long n;                       /* number of states */
@@ -237,7 +238,7 @@ void solver_bfs() {
 
 int main(int argc,char **argv) {
 	int ram1=50,ram2=50;
-	if(argc>1) ram2=strtol(argv[1],0,10);
+	if(argc==2) ram2=strtol(argv[1],0,10);
 	else if(argc>2) ram1=strtol(argv[1],0,10),ram2=strtol(argv[2],0,10);
 	bfs.b1len=ram1*1048576LL;
 	bfs.b2len=ram2*1048576LL;
