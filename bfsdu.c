@@ -57,7 +57,7 @@ static void printhex(int x) {
 
 static void error(char *s) { puts(s); exit(1); }
 
-void solver_init() {
+static void solver_init() {
 	bfs.slen=state_size();
 	bfs.bblen=bfs.blen/bfs.slen;
 	bfs.blen=bfs.bblen*bfs.slen;
@@ -77,7 +77,7 @@ static void copypos(unsigned char *to,unsigned char *from) {
 }
 
 /* slow, generic comparator, potential hotspot */
-int comppos(const void *A,const void *B) {
+static int comppos(const void *A,const void *B) {
 	const unsigned char *a=A,*b=B;
 	int i;
 	for(i=bfs.slen-1;i>=0;i--) {
@@ -179,7 +179,7 @@ static void printqueue() {
 	for(;i<bfs.cure;i+=bfs.slen) printf("cur      %6I64d: ",i),printrawstate(bfs.b+i);
 }
 
-void solver_bfs() {
+static void solver_bfs() {
 	long long at;
 	/* insert initial position into previous iteration */
 	copypos(bfs.b,encode_state());

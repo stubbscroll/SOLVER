@@ -80,7 +80,7 @@ static void copypos(unsigned char *to,unsigned char *from) {
 
 /* this is supposed to work in linux too */
 /* return file size, or -1 if failed */
-long long filesize(const char *s) {
+static long long filesize(const char *s) {
 #ifdef _MSC_VER
 	HANDLE f=CreateFile(s,GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,NULL,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,NULL);
 	LARGE_INTEGER z;
@@ -98,16 +98,7 @@ long long filesize(const char *s) {
 #endif
 }
 
-/* save len bytes from memory *b as given name */
-void savefile(unsigned char *b,size_t len,char *name) {
-	FILE *f=fopen(name,"wb");
-	if(!f) error("couldn't write file");
-	unsigned long long n=fwrite(b,1,len,f);
-	if(n!=len) error("write error");
-	if(fclose(f)) error("error closing file for writing");
-}
-
-void solver_init() {
+static void solver_init() {
 	bfs.slen=state_size();
 	if(bfs.slen>8) error("state size too large (more than 8 bytes)");
 	bfs.b1slen=bfs.b1len/bfs.slen;
@@ -124,7 +115,7 @@ void solver_init() {
 	bfs.outputmode=0;
 }
 
-void createnewgenfile(int gen) {
+static void createnewgenfile(int gen) {
 	char t[100];
 	sprintf(t,"GEN-%04d",gen);
 	FILE *g=fopen(t,"wb");
@@ -133,7 +124,7 @@ void createnewgenfile(int gen) {
 }
 
 /* flushes currently generated states to file GEN-(gen+1) */
-void flushcur() {
+static void flushcur() {
 	char t[100];
 	sprintf(t,"GEN-%04d",bfs.gen+1);
 	FILE *g=fopen(t,"ab");
@@ -145,7 +136,7 @@ void flushcur() {
 	printf(".");
 }
 
-void showsolution() {
+static void showsolution() {
 	bfs.outputstate=getval(encode_state());
 	printf("we won! solution steps (in reverse):\n");
 	printf("move %d\n",bfs.gen+1);
@@ -199,7 +190,7 @@ void add_child(unsigned char *p) {
 	}
 }
 
-void solver_bfs() {
+static void solver_bfs() {
 	/* save initial state to disk as iteration (generation) 0 */
 	copypos(bfs.b2,encode_state());
 	SETVISITED(getval(encode_state()));

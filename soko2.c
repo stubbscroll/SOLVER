@@ -28,22 +28,19 @@
    * there are two ways to define man goal. if it's not defined, the puzzle
      is solved when all blocks are on destinations
    state encoding:
-   - man position+(number of floor cells)*(permutation rank of blocks/floor on
+   - player dir+(5*man position+(number of floor cells)*(permutation rank of blocks/floor on))
      live cells only). this should be shorter than raw permutation rank over
      floor/blocks/man over all floor cells.
-   - we need two separate permutation rank systems, depending on whether the
-     man is on live or dead floor. having one system is easier, but that
-     results in gaps in the mapping which is bad news for compression
+   - man position can have 5 values: 0-3 for player dirs, 4 for not moved
+   - permutation of blocks and floor is calculated first, then man position is
+     calculated as if blocks were walls (replaces the old, slightly worse
+     encoding where the man was considered first, and two cases depending on
+     whether man was on live or dead floor)
    - the only gaps in the current encoding are due to deadlocked states. the
      most common deadlocks (2x2 and N) could be removed from the mapping, but
      that requires a much more computationally intensive algorithm based on
      dynamic programming using frontiers. i haven't investigated the potential
-     gains of this method.
-   - (the two systems have different size, so the shorter size can technically
-     be considered to have a gap at the end of the range)
-   - TODO actually implement that man-position skips blocks! won't make the
-     faster, but the memory savings are significant for the solvers that keeps
-     all states in memory
+     gains of this method, but it would certainly be much, much slower
    deadlock routines only subject to shallow testing, they seem to work
 */
 
@@ -265,9 +262,10 @@ void domain_init() {
 	if(!goals) error("map must contain at least 1 block");
 	for(i=0;i<info.x;i++) for(j=0;j<info.y;j++) if(cur.map[i][j]=='$' && info.id2map[i][j]<0)
 		error("illegal start config, block starts on dead space");
-	/* check size: (#floors) * (lfloor choose blocks) */
-	dsize=(info.floor)*doublenck(info.lfloor,info.blocks);
-	info.dsize=(info.floor)*pas[info.lfloor][info.blocks];
+	/* check size: (#floors-#blocks) * (lfloor choose blocks) */
+	/* because man can't stand on blocks! */
+	dsize=(info.floor-info.blocks)*doublenck(info.lfloor,info.blocks);
+	info.dsize=(info.floor-info.blocks)*pas[info.lfloor][info.blocks];
 	/* if numbers went haywire, we overflowed */
 	if(fabs(dsize-info.dsize)/dsize>0.001) error("state space too large");
 	for(info.slen=0,z=info.dsize;z;info.slen++,z>>=8);
@@ -294,24 +292,23 @@ void print_state() {
 unsigned char *encode_state() {
 	statetype v=0;
 	int i,j,k;
-	/* find man */
-	for(i=0;i<info.x;i++) for(j=0;j<info.y;j++) if(cur.map[i][j]=='@') {
-		v=info.idmap[i][j];
-		break;
+	/* find man: count number of floor (dead or live) before man */
+	for(v=j=0;j<info.y;j++) for(i=0;i<info.x;i++) {
+		if(cur.map[i][j]=='@') goto foundman;
+		else if(cur.map[i][j]=='$') continue;
+		else if(info.smap[i][j]=='#') continue;
+		v++;
 	}
-	/* TODO subtract number of blocks left/above of man from v */
-	/* TODO have 2 systems, depending on whether man is on dead or live cell */
-	/* generate permutation */
+foundman:
+	/* generate permutation for live cells only (floor and blocks */
 	counts[0]=counts[1]=plen=0;
 	for(k=0;k<info.lfloor;k++) {
 		i=info.id2x[k];
 		j=info.id2y[k];
-		if(cur.map[i][j]=='@') continue;
-		else if(cur.map[i][j]==' ') counts[0]++,multiset[plen++]=0;
+		if(cur.map[i][j]==' ' || cur.map[i][j]=='@') counts[0]++,multiset[plen++]=0;
 		else if(cur.map[i][j]=='$') counts[1]++,multiset[plen++]=1;
 	}
-	/* TODO adjust for number of blocks */
-	v+=permrank()*info.floor;
+	v+=permrank()*(info.floor-info.blocks);
 	return getptr(v);
 }
 
@@ -320,14 +317,11 @@ void decode_state(unsigned char *p) {
 	int i,j,k,w,l;
 	/* clear map */
 	for(i=0;i<info.floor;i++) cur.map[info.idx[i]][info.idy[i]]=' ';
-	/* extract man */
-	w=v%info.floor; v/=info.floor;
-	i=info.idx[w]; j=info.idy[w];
-	cur.map[i][j]='@';
+	/* extract man, but don't place him yet */
+	w=v%(info.floor-info.blocks); v/=(info.floor-info.blocks);
 	/* init unrank */
 	counts[0]=info.lfloor-info.blocks;
 	counts[1]=info.blocks;
-	if(info.id2map[i][j]>-1) counts[0]--;
 	plen=counts[0]+counts[1];
 	permunrank(v);
 	for(k=l=0;k<info.lfloor;k++) {
@@ -336,6 +330,14 @@ void decode_state(unsigned char *p) {
 		if(cur.map[i][j]=='@') continue;
 		cur.map[i][j]=multiset[l++]?'$':' ';
 	}
+	for(j=0;j<info.y;j++) for(i=0;i<info.x;i++) {
+		if(info.smap[i][j]=='#' || cur.map[i][j]=='$') continue;
+		if(w--<1) {
+			cur.map[i][j]='@';
+			goto manplaced;
+		}
+	}
+manplaced:;
 }
 
 int won() {
