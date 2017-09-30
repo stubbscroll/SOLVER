@@ -113,6 +113,8 @@ void domain_init() {
 					else error("illegal char");
 				}
 			}
+		} else {
+			printf("ignored unknown command %s\n",t);
 		}
 	}
 	/* generate id-map */
@@ -152,6 +154,7 @@ void print_state() {
 	for(j=0;j<info.y;j++) {
 		for(i=0;i<info.x;i++) {
 			if(cur.map[i][j]==' ' && info.smap[i][j]=='_') putchar('_');
+			else if(cur.map[i][j]==' ' && info.smap[i][j]=='.') putchar('.');
 			else putchar(cur.map[i][j]);
 		}
 		putchar('\n');

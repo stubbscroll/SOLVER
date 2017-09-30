@@ -9,5 +9,6 @@ gcc -o soko3-bfs.exe bfs.c soko3.c -O3 -Wall -std=c99
 gcc -o soko3-bfs2.exe bfs2.c soko3.c -O3 -Wall -std=c99
 gcc -o soko3-bfsd.exe bfsd.c soko3.c -O3 -Wall -std=c99
 gcc -o npuzzle-bfs.exe bfs.c npuzzle.c -O3 -Wall -std=c99
+gcc -o npuzzle-bfs2.exe bfs2.c npuzzle.c -O3 -Wall -std=c99
 gcc -o npuzzle-bfsd.exe bfsd.c npuzzle.c -O3 -Wall -std=c99
 gcc -o npuzzle-bfsdu.exe bfsdu.c npuzzle.c -O3 -Wall -std=c99

@@ -24,9 +24,8 @@ puzzle instances:
 - soko/ - puzzles for soko, soko2, soko3
 
 to come later:
-- improved bfs: vbyte compression, disk swapping
-- improve soko: add floor usable for man but not blocks. add another symbol for
-  man starting on such floor
+- improved bfs: vbyte compression, search from both directions (requires
+  backwards move generator and domains with few goal states)
 - a* (including sophisticated variants, see a certain paper on solving atomix)
 - solution output for bfsd and bfsdu
 - more domains (eligible games are typically pspace-complete and usually

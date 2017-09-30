@@ -4,14 +4,21 @@
 */
 /* improved version of bfs.c
    - supports directed graphs
-   - need (#states/8) bytes for bitmask of visited states
+   - need (#states/8) bytes for bitmask of visited states, for immediate
+     duplicate check
    - store list of visited states for each iteration in lists that are flushed
      to disk as needed (all disk access is linear, should be fast on non-ssd)
-   - duplicates are checked immediately against the bitmask
-   - backward search used to reconstruct solution
-   - faster than bfsd, while being able to search farther (given that we have
+   - since we stored no edges, we need to do backward search used to
+     reconstruct the solution (much faster than the initial search since we
+     don't check for duplicates)
+   - faster than bfsd, while being able to search farther (assuming we have
      enough memory for the bitmask)
-   * vbyte compression can be added for less space usage
+   * TODO vbyte compression can be added for less space usage
+   * TODO solution output could be made much faster by sorting each iteration,
+     and requiring each domain to have a backwards move generator. then a binary
+     search could be done within an iteration for the desired position. however,
+     it's painful to implement (especially the backwards move generator, which
+     is pointless otherwise)
    usage:
    - solver a b < file.txt OR
      solver b < file.txt, where
