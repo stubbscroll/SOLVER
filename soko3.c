@@ -298,7 +298,9 @@ int state_size() {
 }
 
 /* this doesn't currently output _ correctly, because the dead space search
-   overwrote them with d. care about it later */
+   overwrote them with d. care about it later. we don't want to print out all
+   the automatically detected 'd's, so we need to store the '_'s somewhere
+   else */
 void print_state() {
 	int i,j;
 	for(j=0;j<info.y;j++) {
@@ -316,14 +318,45 @@ unsigned char *encode_state() {
 	statetype v=0;
 	int i,j,k;
 	/* find man: count number of floor (dead or live) before man */
-	for(v=j=0;j<info.y;j++) for(i=0;i<info.x;i++) {
+	for(v=i=j=0;j<info.y;j++) for(i=0;i<info.x;i++) {
 		if(cur.map[i][j]=='@') goto foundman;
 		else if(cur.map[i][j]=='$') continue;
 		else if(info.smap[i][j]=='#') continue;
 		v++;
 	}
 foundman:
-	/* generate permutation for live cells only (floor and blocks */
+	/* set playerdir to 4 (no direction) if there are no slappable blocks nearby */
+	if(cur.playerdir<4) {
+		int x2=i+dx[cur.playerdir],y2=j+dy[cur.playerdir];
+		/* can we continue in direction at all? check for wall */
+		if(x2<0 || y2<0 || x2>=info.x || y2>=info.y || info.smap[x2][y2]=='#') {
+//			printf("pruned dir %d (blocked by wall)\n",cur.playerdir);print_state();
+			cur.playerdir=4;
+			goto donedir;
+		}
+		/* we have block in front of us, check if it can be pushed */
+		if(cur.map[x2][y2]=='$') {
+			int x3=x2+dx[cur.playerdir],y3=y2+dy[cur.playerdir];
+			if(x3<0 || y3<0 || x3>=info.x || y3>=info.y || (info.smap[x3][y3]!=' ' && info.smap[x3][y3]!='.') || cur.map[x3][y3]=='$') {
+//				printf("pruned dir %d (blocked by block)\n",cur.playerdir);print_state();
+				cur.playerdir=4;
+				goto donedir;
+			}
+		}
+		/* we can move, so check for slappable blocks on both sides */
+		int dd=(cur.playerdir+1)&3;
+		x2=i+dx[dd]; y2=j+dy[dd];
+		int x3=x2+dx[dd],y3=y2+dy[dd];
+		if(x3>=0 && y3>=0 && x3<info.x && y3<info.y && cur.map[x2][y2]=='$' && cur.map[x3][y3]==' ' && info.smap[x3][y3]!='d') goto donedir;
+		dd^=2;
+		x2=i+dx[dd]; y2=j+dy[dd];
+		x3=x2+dx[dd]; y3=y2+dy[dd];
+		if(x3>=0 && y3>=0 && x3<info.x && y3<info.y && cur.map[x2][y2]=='$' && cur.map[x3][y3]==' ' && info.smap[x3][y3]!='d') goto donedir;
+//		printf("pruned dir %d (no slappable blocks)\n",cur.playerdir);print_state();
+		cur.playerdir=4;
+	}
+donedir:
+	/* generate permutation for live cells only (floor and blocks) */
 	counts[0]=counts[1]=plen=0;
 	for(k=0;k<info.lfloor;k++) {
 		i=info.id2x[k];

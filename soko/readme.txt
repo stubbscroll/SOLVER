@@ -1,8 +1,10 @@
 sample levels for the sokoban solver
 
-cc1-132-ur.txt   level 132 (mix up) from chip's challenge 1, upper right part
+cc1-132-ur.txt   level 132 (mix up) from chip's challenge 1, upper right part.
                  not solvable with this program (yet)
 cc2-100-01.txt   room 01 from level 100 (crazy i) in chip's challenge 2
+cc2-138b.txt     first room from level 138 after getting red key. demonstrates
+                 player-only tile (fake green wall)
 cc3d-b08.txt     chuck's challenge 3d level bebinca 8
 cc3d-b25.txt     chuck's challenge 3d level bebinca 25
 cclp3-065-07.txt cclp3 level 65 (countdown), last room

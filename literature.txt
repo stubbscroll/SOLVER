@@ -21,10 +21,99 @@ transposition table
 ===============================================================================
 DETERMINISTIC SOLITAIRE GAMES-15-puzzle
 -------------------------------------------------------------------------------
+Efficiently searching the 15-puzzle (Culberson, Schaeffer, 1995)
+
+Description of ways to solve the 15-puzzle that improves upon pure A*. The
+improved way is to use IDA* (iteratively increase the cutoff for max solution
+length) with reduction databases that contain the minimal number of moves for
+correctly placing N designated tiles as well as transposition tables. The
+improvements are massive compared to the Manhattan distance heuristic.
+-------------------------------------------------------------------------------
+A real-time algorithm for the (n^2-1)-puzzle (Ian Parberry, 1995)
+
+Description of an algorithm that solves the (n^2-1)-puzzle that uses O(1) time
+for each move, and the number of moves is less than 19 times the optimal
+solution as n goes to infinity. The paper is slightly math-heavy.
+-------------------------------------------------------------------------------
+Finding optimal solutions to the twenty-four puzzle (Korf, Taylor, 1996)
+
+Descriptions of improvements to the Manhattan distance heuristic for the n^2-1
+puzzle, and introduction to a largely domain-independent general theory for
+automatically learning such heuristics. As a result, optimal solutions were
+obtained for several random instances of the 24-puzzle.
+-------------------------------------------------------------------------------
+A modern treatment of the 15-puzzle (Aaron F Archer, 1999)
+
+Description of the unsolvable variant with wrong parity, and a proof of its
+unsolvability.
+-------------------------------------------------------------------------------
+On sliding block puzzles (Karlemo, Östergård, 2000)
+
+Discussion of methods for finding the diameter of the state space graph for
+the n^2-1 puzzle, which results in an improved uppwer bound for the 24-puzzle.
+-------------------------------------------------------------------------------
+Disjoint pattern database heuristics (Korf, Felner, 2001)
+
+An A* heuristic for the n^2-1 puzzle is described that uses disjoint pattern
+databases, where the state is divided into disjoint sets such that the two
+database values can be added without breaking admissibility. The result is a
+massive speedup compared to non-additive pattern databases and the Manhattan
+distance heuristic.
+-------------------------------------------------------------------------------
 Large-scale parallel breadth-first search (Korf, Schultze, 2005)
+
+Description of a disk-based parallel implementation of a breadth-first
+algorithm that was used to do a complete search of the 15-puzzle. A method of
+delayed duplicate detection is employed that uses two perfect hash functions,
+where one of them sorts the states into different files, combined with other
+improvements that reduces the number of time each node is vitited. A linear-
+time (and exponential space) algorithm for ranking/unranking permutations
+without duplicates is given.
+-------------------------------------------------------------------------------
+Solving the 24 puzzle with instance dependent pattern databases (Felner,
+Adler, 2005)
+
+Description of a method of dynamically growing pattern databases where the
+grid is subdivided into 3 disjoint regions of size 8, which is tailored to a
+given instance. This achieves better results than smaller, static pattern
+databases subdivided into 4 disjoint regions of size 6.
+-------------------------------------------------------------------------------
+Solving combinatorial problems: The 15-puzzle (Pizlo, Li, 2005)
+
+Description of an experiment with humans solving the n^2-1 puzzle manually for
+different values of n, with an extensive results section with many plots. No
+computational methods are discussed.
+-------------------------------------------------------------------------------
+Parallel combinatorial search on computer cluster: Sam Loyd's puzzle
+(Plamenka Borovska, 2006)
+
+"Sam Loyd's puzzle" is the 15-puzzle. The title is very misleading since he had
+nothing to do with the invention and popularization of the puzzle. A high-level
+description of a parallelized branch-and-bound algorithm that tries to divide
+the search space into subproblems that are distributed and load-balanced to
+subprocesses. Very little implementation details are provided.
+
+===============================================================================
+DETERMINISTIC SOLITAIRE GAMES-sliding block puzzles (Klotski, Rush hour)
+-------------------------------------------------------------------------------
+Solving sliding-block puzzles (Ruben Spaans, 2009) [Specialization project]
+
+Detailed description of various algorithms for deterministic solitaire games,
+which eventually closes in on the BFS, A* and IDA* algorithms. Several
+domain-specific enhancements are discussed, though most of them break
+optimality. A state representation using permutation rank is suggested, and
+algorithms for rank and unrank of permutations with duplicates are given. An
+efficient algorithm to calculate an upper bound of the state space size based
+on the number of ways to pack the blocks is given.
+(Warning, I am the author.)
 
 ===============================================================================
 DETERMINISTIC SOLITAIRE GAMES-sokoban
+-------------------------------------------------------------------------------
+Sokoban is PSPACE-complete (Joseph C Culberson, 1997)
+
+Proof that Sokoban is PSPACE-complete by emulating a finite tape Turing
+machine.
 -------------------------------------------------------------------------------
 Pushing the limits: New developments in single-agent search (Andreas Junghanns,
 1999) [PhD thesis]
@@ -33,7 +122,7 @@ Very thorough description of finding push-optimal Sokoban solutions with IDA*.
 Domain-specific optimizations are described, such as deadlock detection,
 tunnel/goal macros, and move ordering based on relevance. In addition, over-
 estimation is tried (which breaks optimality). The program manages to solve
-56 out of 90 puzzles from xsokoban.
+60 out of 90 puzzles from xsokoban.
 -------------------------------------------------------------------------------
 Single-player games: introduction to a new solving method combining state-space
 modelling with a multi-agent representation (Francois Van Lishout, Pascal
@@ -48,6 +137,8 @@ subclass membership is not given.
 
 ===============================================================================
 DETERMINISTIC SOLITAIRE GAMES-computational complexity results
+
+Complexity results for games that have their own heading goes there instead
 -------------------------------------------------------------------------------
 
 ===============================================================================
@@ -80,7 +171,15 @@ MULTIPLAYER GAMES WITH HIDDEN INFORMATION AND/OR CHANCE
 -------------------------------------------------------------------------------
 
 ===============================================================================
-add sections for useful subroutines
-- permutation rank/unrank
-- stat space compression, various algorithms like vbyte compression,
-  pfor-delta etc, look at compression of inversed indexes
+ALGORITHMS USED IN GAME SOLVING
+-------------------------------------------------------------------------------
+- bfs, a*, ida* etc, including heuristics
+
+===============================================================================
+TECHNIQUES FOR ENHANCING ALGORITHMS USED IN GAME SOLVING
+-------------------------------------------------------------------------------
+- permutation rank/unrank, with and without duplicates
+- "inverse index compression", variable byte encoding, used in compressing
+  difference of sorted states
+
+===============================================================================

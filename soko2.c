@@ -320,7 +320,7 @@ unsigned char *encode_state() {
 		v++;
 	}
 foundman:
-	/* generate permutation for live cells only (floor and blocks */
+	/* generate permutation for live cells only (floor and blocks) */
 	counts[0]=counts[1]=plen=0;
 	for(k=0;k<info.lfloor;k++) {
 		i=info.id2x[k];
@@ -401,7 +401,8 @@ static int bad2x2v2() {
               $#
 */
 /* TODO can optimize further by precalculating a list of (x,y) coordinates
-   where this wall pattern occurs, and check only these */
+   where this wall pattern occurs, and that have live non-destination cells,
+   and check only these */
 static int badnhor1() {
 	for(int i=0;i<info.x-2;i++) for(int j=0;j<info.y-1;j++) {
 		/* walls not in place, deadlock not possible */
