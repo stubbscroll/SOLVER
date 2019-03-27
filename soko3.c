@@ -7,6 +7,8 @@
    - find deadlocks:
      - block that cannot be moved to any goal (block on dead cells)
      - block stuck in 2x2 or N configuration
+   - detection of goal corridor with deadlock checking: blocks must be pushed
+     all the way in, or else it's an illegal configuration
    - tighter state encoding, 1-1 mapping from integers to permutation of
      floor cells and blocks
    usage:
@@ -16,6 +18,8 @@
    - goal x y: set man goal position (use if man goal overlaps with block,
      man-only floor or starting position). x,y are 0-indexed
    - skip-n-deadlock: skip the deadlock check that searches for the N pattern
+   - skip-goal-corridor-deadlock: skip the deadlock check that checks for bad
+     states in block corridor
    - map: followed by y lines with map data
      - #: wall
      -  : floor
@@ -80,11 +84,18 @@ static struct static_s {
 	int goalx,goaly;     /* player goal */
 	statetype dsize;     /* domain size (number of states) */
 	int slen;            /* number of bytes in state */
+
+	int hascorridor;     /* 1: has a goal corridor */
+	int corridorlen;     /* length of corridor */
+	int corridorx;       /* x-coordinate of start of corridor */
+	int corridory;       /* y-coordinate of start of corridor */
+	int corridordir;     /* direction of corridor (inwards) */
 } info;
 
 /* solver options */
 static struct options_s {
 	int skipndeadlock;   /* 1: skip checking for n-deadlock pattern */
+	int skipgoaldeadlock; /* 1: skip checking for goal corridor deadlock */
 } options;
 
 static struct state_s {
@@ -149,7 +160,7 @@ static statetype permrank() {
 }
 
 /* given permutation rank, return sequence in multiset[] */
-void permunrank(statetype rank) {
+static void permunrank(statetype rank) {
 	statetype run,next,r2;
 	int i,j,upper,lower,k,left[2];
 	for(i=0;i<2;i++) left[i]=counts[i];
@@ -200,6 +211,52 @@ static void deadsearch() {
 	for(i=0;i<info.x;i++) for(j=0;j<info.y;j++) if(info.smap[i][j]=='_') info.smap[i][j]='d';
 }
 
+/* find goal corridor that looks roughly like this:
+   ##### normal
+   #.... level
+   ##### here
+   it's a string of goals (.) that has a space behind it, a wall in front
+   of it and walls on all sides (all out-of-bounds cells count as wall).
+	 this routine finds the first corridor of length of at least 3 and uses it.
+*/
+static void findgoalcorridor() {
+	info.hascorridor=0;
+	for(int i=0;i<info.x;i++) for(int j=0;j<info.y;j++) if(info.smap[i][j]=='.') {
+		for(int d=0;d<4;d++) {
+			int bx=i+dx[d^2],by=j+dy[d^2];
+			/* no open space behind: abort this goal+direction */
+			if(bx<0 || by<0 || bx>=info.x || by>=info.y || info.smap[bx][by]!=' ') continue;
+			int length=1;
+			int x2=i,y2=j;
+			int dl=(d+1)&3,dr=(d+3)&3;
+			while(1) {
+				/* check left and right, out-of-bounds or wall is ok */
+				int x3=x2+dx[dl],y3=y2+dy[dl];
+				if(x3>=0 && y3>=0 && x3<info.x && y3<info.y && info.smap[x3][y3]!='#') goto notcorridor;
+				x3=x2+dx[dr]; y3=y2+dy[dr];
+				if(x3>=0 && y3>=0 && x3<info.x && y3<info.y && info.smap[x3][y3]!='#') goto notcorridor;
+				/* check in front */
+				x2+=dx[d]; y2+=dy[d];
+				if(x2<0 || y2<0 || x2>=info.x || y2>=info.y) break; /* we won */
+				if(info.smap[x2][y2]=='#') break; /* we won */
+				if(info.smap[x2][y2]=='.') {
+					length++;
+					continue;
+				}
+				goto notcorridor;
+			}
+			if(length<3) continue; /* not long enough */
+			info.hascorridor=1;
+			info.corridorlen=length;
+			info.corridorx=i;
+			info.corridory=j;
+			info.corridordir=d;
+			return;
+		notcorridor:;
+		}
+	}
+}
+
 /* read input and populate info and cur */
 void domain_init() {
 	char s[1000],t[100],c;
@@ -213,7 +270,9 @@ void domain_init() {
 	}
 	info.goalx=info.goaly=-1;
 	info.x=info.y=0;
+	info.hascorridor=0;
 	options.skipndeadlock=0;
+	options.skipgoaldeadlock=0;
 	cur.playerdir=4;
 	memset(info.smap,0,sizeof(info.smap));
 	memset(cur.map,0,sizeof(cur.map));
@@ -229,6 +288,8 @@ void domain_init() {
 			if(info.goalx<0 || info.goaly<0 || info.goalx>=info.x || info.goaly>=info.y) error("man goal outside of map");
 		} else if(!strcmp(t,"skip-n-deadlock")) {
 			options.skipndeadlock=1;
+		} else if(!strcmp(t,"skip-goal-corridor-deadlock")) {
+			options.skipgoaldeadlock=1;
 		} else if(!strcmp(t,"map")) {
 			for(j=0;j<info.y;j++) {
 				if(!fgets(s,998,stdin)) error("map ended unexpectedly");
@@ -279,6 +340,8 @@ void domain_init() {
 	if(!goals) error("map must contain at least 1 block");
 	for(i=0;i<info.x;i++) for(j=0;j<info.y;j++) if(cur.map[i][j]=='$' && info.id2map[i][j]<0)
 		error("illegal start config, block starts on dead space");
+	/* find goal corridor */
+	if(!options.skipgoaldeadlock) findgoalcorridor();
 	/* check size: (#floors-#blocks) * (lfloor choose blocks) */
 	/* multiply by 5 for player dir */
 	dsize=5*(info.floor-info.blocks)*doublenck(info.lfloor,info.blocks);
@@ -508,6 +571,23 @@ static int badnver2() {
 	return 0;
 }
 
+static int hasgoaldeadlock() {
+	if(!info.hascorridor) return 0;
+	/* count number of blocks */
+	int x2=info.corridorx,y2=info.corridory;
+	int d=info.corridordir,len=info.corridorlen;
+	/* check: deadlock if the following pattern exists: .$.
+	   (which means the man pushed a block halfway in, but ran away).
+	   i believe this is sufficient to catch all goal deadlocks and
+	   inefficiencies */
+	for(int i=0;i<len-2;i++) {
+		if(cur.map[x2+(i+0)*dx[d]][y2+(i+0)*dy[d]]==' ' &&
+		   cur.map[x2+(i+1)*dx[d]][y2+(i+1)*dy[d]]=='$' &&
+		   cur.map[x2+(i+2)*dx[d]][y2+(i+2)*dy[d]]==' ') return 1;
+	}
+	return 0;
+}
+
 static int deadpos2() {
 	/* check for 2x2 configurations of wall/block where >=1 block is not on goal */
 	if(bad2x2v2()) return 1;
@@ -517,6 +597,10 @@ static int deadpos2() {
 		if(badnhor2()) return 1;
 		if(badnver1()) return 1;
 		if(badnver2()) return 1;
+	}
+	/* check for blocks not pushed fully in the goal corridor */
+	if(!options.skipgoaldeadlock) {
+		if(hasgoaldeadlock()) return 1;
 	}
 	return 0;
 }
