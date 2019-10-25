@@ -1,4 +1,4 @@
-a framework for state space graph search
+a modular framework for state space graph search
 
 the goal is to provide state-of-the-art implementations of search algorithms
 that can search in huge graphs while using little memory per node. the point of
@@ -14,6 +14,7 @@ algorithms implemented:
 
 domains implemented:
 - npuzzle (undirected, bipartite) - (mn-1)-puzzle (aka 15-puzzle)
+- chip1 - sokoban with popup walls and force floors
 - soko - simple sokoban, no checking for dead states etc
 - soko2 - sokoban, checks for simple deadlocks, better encoding
 - soko3 - sokoban, same as soko2 but with block slapping (feature in chip's
@@ -21,6 +22,7 @@ domains implemented:
 
 puzzle instances:
 - npuzzle/ - puzzles for n-puzzle
+- chip/ - puzzles for chip1
 - soko/ - puzzles for soko, soko2, soko3
 
 to come later:
@@ -40,6 +42,9 @@ future work:
   delay the delayed duplicate detection for several generations when the size
   of the current generation is low compared to the number of all visited
   positions?
+- bfs2 is much better than bfsd, but the memory requirements are pretty hefty.
+  find further improvements, that would allow us to search farther in graphs
+  where most states are unreachable
 
 to compile (in windows):
 

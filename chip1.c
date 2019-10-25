@@ -31,9 +31,11 @@
      - +: man starting on destination
      - =: man starting on dead cell
      - g: man goal (aka exit)
+     - i suppose i could add ice
    - additional elements
-     - < > ^ v: force floor (everything needs 0 moves to travel fully)
-     - o: open popup wall (when taken, change to # in layer 1)
+     - < > ^ v: force floor (everything needs 0 moves to travel fully, no
+       overriding)
+     - o: open popup wall (when taken, change to # in current state map)
    * there are two ways to define man goal. if it's not defined, the puzzle
      is solved when all blocks are on destinations
    * it's not allowed to push a block onto force floor that doesn't end on
@@ -243,6 +245,10 @@ static void findgoalcorridor() {
 	}
 }
 
+static int isforcefloor(int i,int j) {
+	return info.smap[i][j]=='<' || info.smap[i][j]=='>' || info.smap[i][j]=='^' || info.smap[i][j]=='v';
+}
+
 /* read input and populate info and cur */
 void domain_init() {
 	char s[1000],t[100],c;
@@ -291,6 +297,10 @@ void domain_init() {
 					else if(c=='=') info.smap[i][j]='_',cur.map[i][j]='@';
 					else if(c=='g') info.smap[i][j]=' ',cur.map[i][j]=' ',info.goalx=i,info.goaly=j;
 					else if(c=='o') info.smap[i][j]='_',cur.map[i][j]='o';
+					else if(c=='<') info.smap[i][j]='<',cur.map[i][j]=' ';
+					else if(c=='>') info.smap[i][j]='>',cur.map[i][j]=' ';
+					else if(c=='^') info.smap[i][j]='^',cur.map[i][j]=' ';
+					else if(c=='v') info.smap[i][j]='v',cur.map[i][j]=' ';
 					else printf("illegal char %d\n",c),exit(1);
 				}
 			}
@@ -298,15 +308,13 @@ void domain_init() {
 			printf("ignored unknown command %s\n",t);
 		}
 	}
-	/* at this point, cells not yet determined as live or dead are marked with
-	   'd', while user-set dead cells are marked with '_' */
-	/* search for non-dead cells */
 	/* disable deadsearch until it works with force floors */
 	/* generate id-map */
 	memset(info.idmap,-1,sizeof(info.idmap));
 	memset(info.id2map,-1,sizeof(info.id2map));
 	info.floor=info.blocks=info.lfloor=info.popup=0;
 	for(i=0;i<info.x;i++) for(j=0;j<info.y;j++) {
+		if(isforcefloor(i,j)) continue; /* force floors can't contain things */
 		if(info.smap[i][j]==' ' || info.smap[i][j]=='.') {
 			info.id2x[info.lfloor]=i;
 			info.id2y[info.lfloor]=j;
@@ -358,6 +366,7 @@ void print_state() {
 		for(i=0;i<info.x;i++) {
 			if(cur.map[i][j]==' ' && info.smap[i][j]=='_') putchar('_');
 			else if(cur.map[i][j]==' ' && info.smap[i][j]=='.') putchar('.');
+			else if(isforcefloor(i,j)) putchar(info.smap[i][j]);
 			else putchar(cur.map[i][j]);
 		}
 		putchar('\n');
@@ -373,6 +382,7 @@ unsigned char *encode_state() {
 		if(cur.map[i][j]=='@') goto foundman;
 		else if(cur.map[i][j]=='$') continue;
 		else if(info.smap[i][j]=='#') continue;
+		else if(isforcefloor(i,j)) continue;
 		v++;
 	}
 foundman:
@@ -418,7 +428,7 @@ void decode_state(unsigned char *p) {
 		cur.map[i][j]=multiset[l++]?'$':' ';
 	}
 	for(j=0;j<info.y;j++) for(i=0;i<info.x;i++) {
-		if(info.smap[i][j]=='#' || cur.map[i][j]=='$') continue;
+		if(info.smap[i][j]=='#' || cur.map[i][j]=='$' || isforcefloor(i,j)) continue;
 		if(w--<1) {
 			cur.map[i][j]='@';
 			goto manplaced;
@@ -578,14 +588,33 @@ static int deadpos2() {
 	return 0;
 }
 
+/* given tile (*i,*j) with force floor, return where we eventually end up
+   (also in (*i,*j)) plus new direction *d */
+static void followforcefloor(int *i,int *j,int *d) {
+	int steps=0;
+	while(isforcefloor(*i,*j)) {
+		char c=info.smap[*i][*j];
+		if(c=='<') (*i)--,*d=2;
+		else if(c=='>') (*i)++,*d=0;
+		else if(c=='^') (*j)--,*d=3;
+		else if(c=='v') (*j)++,*d=1;
+		steps++;
+		if(steps>MAX*MAX) puts("infinite loop"),exit(1);
+	}
+}
+
 void visit_neighbours() {
 	int cx=0,cy=0,i,j,d,x2,y2,x3,y3;
 	/* find man */
 	for(i=0;i<info.x;i++) for(j=0;j<info.y;j++) if(cur.map[i][j]=='@') cx=i,cy=j;
 	for(d=0;d<4;d++) {
 		x2=cx+dx[d]; y2=cy+dy[d];
-		char bak=cur.map[x2][y2]; /* preserve status of popup wall */
 		if(x2<0 || y2<0 || x2>=info.x || y2>=info.y || iswall(x2,y2)) continue;
+		int d2=d;
+		if(isforcefloor(x2,y2)) followforcefloor(&x2,&y2,&d2);
+		/* special case: we move to the tile we came from: ignore the move */
+		if(cx==x2 && cy==y2) continue;
+		char bak=cur.map[x2][y2]; /* preserve status of popup wall */
 		if(cur.map[x2][y2]==' ' || cur.map[x2][y2]=='o') {
 			/* move man */
 			cur.map[cx][cy]=' ';
@@ -594,16 +623,30 @@ void visit_neighbours() {
 			cur.map[cx][cy]='@';
 			cur.map[x2][y2]=bak;
 		} else if(cur.map[x2][y2]=='$') {
-			x3=x2+dx[d]; y3=y2+dy[d];
-			if(x3<0 || y3<0 || x3>=info.x || y3>=info.y || iswall(x3,y3) || info.smap[x3][y3]=='d' || cur.map[x3][y3]!=' ') continue;
-			/* push block */
-			cur.map[cx][cy]=' ';
-			cur.map[x2][y2]='@';
-			cur.map[x3][y3]='$';
-			if(!deadpos2()) add_child(encode_state());
-			cur.map[cx][cy]='@';
-			cur.map[x2][y2]='$';
-			cur.map[x3][y3]=' ';
+			x3=x2+dx[d2]; y3=y2+dy[d2];
+			if(x3<0 || y3<0 || x3>=info.x || y3>=info.y || iswall(x3,y3) || info.smap[x3][y3]=='_' || info.smap[x3][y3]=='d' || cur.map[x3][y3]!=' ') continue;
+			int d3=d2;
+			if(isforcefloor(x3,y3)) followforcefloor(&x3,&y3,&d3);
+			if(iswall(x3,y3) || info.smap[x3][y3]=='_' || info.smap[x3][y3]=='d' || cur.map[x3][y3]!=' ') continue;
+			/* check special case 1: we get whacked by the block we just pushed */
+			if(x2==x3 && y2==y3) continue;
+			/* check special case 2: we push block to the tile we moved from */
+			if(cx==x3 && cy==y3) {
+				cur.map[cx][cy]='$';
+				cur.map[x2][y2]='@';
+				if(!deadpos2()) add_child(encode_state());
+				cur.map[cx][cy]='@';
+				cur.map[x2][y2]='$';
+			} else {
+				/* normal case: push the block normally, all relevant tiles are different */
+				cur.map[cx][cy]=' ';
+				cur.map[x2][y2]='@';
+				cur.map[x3][y3]='$';
+				if(!deadpos2()) add_child(encode_state());
+				cur.map[cx][cy]='@';
+				cur.map[x2][y2]='$';
+				cur.map[x3][y3]=' ';
+			}
 		}
 	}
 }
