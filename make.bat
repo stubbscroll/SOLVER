@@ -1,4 +1,7 @@
 @rem make all eligible combinations
+gcc -o chip1-bfs.exe bfs.c chip1.c -O3 -Wall -std=c99
+gcc -o chip1-bfs2.exe bfs.c chip1.c -O3 -Wall -std=c99
+gcc -o chip1-bfsd.exe bfs.c chip1.c -O3 -Wall -std=c99
 gcc -o soko-bfs.exe bfs.c soko.c -O3 -Wall -std=c99
 gcc -o soko-bfs2.exe bfs2.c soko.c -O3 -Wall -std=c99
 gcc -o soko-bfsd.exe bfsd.c soko.c -O3 -Wall -std=c99
