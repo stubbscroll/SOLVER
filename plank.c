@@ -192,6 +192,7 @@ static int drawbridge(int x1,int y1,int d) {
 void domain_init() {
 	char s[1000],t[100];
 	int i,j;
+	int starts,goals;
 	statetype z;
 	/* permutation init */
 	for(i=0;i<MAXPASCAL;i++) {
@@ -209,16 +210,24 @@ void domain_init() {
 			if(info.x>MAX || info.y>MAX) error("map too large, increase MAX and recompile");
 		} else if(!strcmp(t,"map")) {
 			for(j=0;j<info.y*2-1;j++) {
-				if(!fgets(s,998,stdin)) error("map ended unexpectedly");
+				if(!fgets(s,998,stdin)) {
+					for(;j<info.y*2-1;j++) {
+						for(i=0;i<info.x*2-1;i++) cur.map[i][j]=' ';
+						cur.map[i][j]=0;
+					}
+					goto mapended;
+				}
 				for(i=0;i<info.x*2-1 && s[i] && s[i]!=13 && s[i]!=10;i++) cur.map[i][j]=s[i];
 				for(;i<info.x*2-1;i++) cur.map[i][j]=' ';
+				cur.map[i][j]=0;
 			}
 		} else {
 			printf("ignored unknown command %s\n",t);
 		}
 	}
+mapended:
 	/* dumb sanity-check map */
-	int starts=0,goals=0;
+	starts=0; goals=0;
 	info.goalx=info.goaly=-1;
 	for(int i=0;i<info.x;i++) for(int j=0;j<info.y;j++) {
 		char c=cur.map[i*2][j*2];
@@ -304,6 +313,8 @@ void print_state() {
 
 unsigned char *encode_state() {
 	statetype v=0;
+//	puts("encode start");
+//	print_state();
 	/* encode planks */
 	for(int i=1;i<MAXPL;i++) if(info.planklen[i]>0) {
 		counts[0]=counts[1]=plen=0;
@@ -326,6 +337,7 @@ unsigned char *encode_state() {
 //		for(int j=0;j<plen;j++) printf("%d",multiset[j]);
 //		printf("% I64d\n",pas[plen][counts[1]]);
 		v*=pas[plen][counts[1]]; v+=permrank();
+//		printf("  v=%I64d\n",v);
 	}
 	/* man position */
 	/* TODO normalize man position with bfs/dfs (will reduce iteration size) */
@@ -347,12 +359,14 @@ void decode_state(unsigned char *p) {
 	}
 	/* man pos */
 	cur.manpos=v%info.stumps; v/=info.stumps;
+//	printf("  v=%I64d\n",v);
 	/* decode planks */
 	for(int i=MAXPL-1;i;i--) if(info.planklen[i]>0) {
 		counts[0]=info.bridgen[i]+1-info.planklen[i];
 		counts[1]=info.planklen[i];
 		plen=counts[0]+counts[1];
-		permunrank(v%pas[plen][counts[0]]); v/=pas[plen][counts[0]];
+		permunrank(v%pas[plen][counts[1]]); v/=pas[plen][counts[1]];
+//		printf("  v=%I64d\n",v);
 //		for(int j=0;j<plen;j++) printf("%d",multiset[j]);
 //		printf("% I64d\n",pas[plen][counts[1]]);
 		for(int j=0;j<info.bridgen[i];j++) if(multiset[j]) {
@@ -360,8 +374,8 @@ void decode_state(unsigned char *p) {
 			if(!drawbridge(info.bx[i][j],info.by[i][j],info.bd[i][j])) puts("sanity error, overlapping bridge");
 		}
 		if(multiset[plen-1]) cur.inventory=i;
-		else cur.inventory=0;
 	}
+//	puts("decode end");
 //	print_state();
 }
 

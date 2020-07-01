@@ -1,3 +1,4 @@
+# puzzle with extremely large state space size
 size 7 5
 map
 S-*-*-*-*-*-*
