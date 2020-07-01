@@ -1,0 +1,11 @@
+# size x y: the number of stump spots in each dimension.
+# the actual ascii art is twice as large (space between neighbouring stumps)
+size 7 5
+map
+
+
+S---*
+    |
+    *   *
+
+        *   T
