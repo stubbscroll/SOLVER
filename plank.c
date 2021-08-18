@@ -47,7 +47,7 @@ static struct state_s {
 	char map[MAX*2-1][MAX*2-1];
 	int inventory;       /* length of plank in inventory, 0=nothing */
 	int manpos;          /* man position (index into stump array) */
-} cur;
+} cur[MAXTHR];
 
 static void error(char *s) { puts(s); exit(1); }
 
@@ -59,12 +59,13 @@ static statetype getval(unsigned char *p) {
 	return n;
 }
 
+static unsigned char p[MAXTHR][16];
+
 /* convert statetype to pointer-thing */
-static unsigned char *getptr(statetype v) {
-	static unsigned char p[16];
+static unsigned char *getptr(statetype v,int thr) {
 	int i;
-	for(i=0;i<info.slen;i++) p[i]=v&255,v>>=8;
-	return p;
+	for(i=0;i<info.slen;i++) p[thr][i]=v&255,v>>=8;
+	return p[thr];
 }
 
 /* ----- state representation: permutation rank ---------------------------- */
@@ -137,11 +138,11 @@ static double doublenck(int n,int k) {
 
 /* find length of plank starting from stump at x,y, going in direction
    dx,dy. length 0 means no plank there */
-static int scanplank(int x,int y,int d,char z) {
+static int scanplank(int x,int y,int d,char z,int thr) {
 	int len=1;
 	x=(x*2+dx[d]);
 	y=(y*2+dy[d]);
-	while(x<info.x*2-1 && y<info.y*2-1 && cur.map[x][y]==z) {
+	while(x<info.x*2-1 && y<info.y*2-1 && cur[thr].map[x][y]==z) {
 		x+=dx[d]; y+=dy[d];
 		len++;
 	}
@@ -159,11 +160,11 @@ static int isbridge(char c) {
 /* find length of bridge starting at x,y (not doubled),
    going in direction d (look up in dx,dy) */
 /* return -1 if no bridge possible */
-static int scanbridge(int x,int y,int d) {
+static int scanbridge(int x,int y,int d,int thr) {
 	int len=1;
 	x=(x+dx[d])*2; y=(y+dy[d])*2;
 	while(x>=0 && y>=0 && x<info.x*2-1 && y<info.y*2-1) {
-		if(isstump(cur.map[x][y])) return len;
+		if(isstump(cur[thr].map[x][y])) return len;
 		x+=dx[d]*2;
 		y+=dy[d]*2;
 		len++;
@@ -173,17 +174,17 @@ static int scanbridge(int x,int y,int d) {
 
 /* draw bridge on current state map */
 /* return 0 (failed) if this bridge tried to overlap */
-static int drawbridge(int x1,int y1,int d) {
+static int drawbridge(int x1,int y1,int d,int thr) {
 	char c=(d==0?'-':'|');
 	int x=x1*2+dx[d],y=y1*2+dy[d];
 	/* check if bridge exists) */
-	while(!isstump(cur.map[x][y])) {
-		if(isbridge(cur.map[x][y])) return 0;
+	while(!isstump(cur[thr].map[x][y])) {
+		if(isbridge(cur[thr].map[x][y])) return 0;
 		x+=dx[d]; y+=dy[d];
 	}
 	x=x1*2+dx[d]; y=y1*2+dy[d];
-	while(!isstump(cur.map[x][y])) {
-		cur.map[x][y]=c;
+	while(!isstump(cur[thr].map[x][y])) {
+		cur[thr].map[x][y]=c;
 		x+=dx[d]; y+=dy[d];
 	}
 	return 1;
@@ -200,7 +201,7 @@ void domain_init() {
 		for(j=1;j<i;j++) pas[i][j]=pas[i-1][j]+pas[i-1][j-1];
 	}
 	info.x=info.y=0;
-	cur.inventory=0;
+	cur[0].inventory=0;
 	while(fgets(s,998,stdin)) {
 		if(s[0]=='#') continue; /* non-map line starting with #: comment */
 		if(s[0]==13 || s[0]==10) continue; /* blank line */
@@ -212,14 +213,14 @@ void domain_init() {
 			for(j=0;j<info.y*2-1;j++) {
 				if(!fgets(s,998,stdin)) {
 					for(;j<info.y*2-1;j++) {
-						for(i=0;i<info.x*2-1;i++) cur.map[i][j]=' ';
-						cur.map[i][j]=0;
+						for(i=0;i<info.x*2-1;i++) cur[0].map[i][j]=' ';
+						cur[0].map[i][j]=0;
 					}
 					goto mapended;
 				}
-				for(i=0;i<info.x*2-1 && s[i] && s[i]!=13 && s[i]!=10;i++) cur.map[i][j]=s[i];
-				for(;i<info.x*2-1;i++) cur.map[i][j]=' ';
-				cur.map[i][j]=0;
+				for(i=0;i<info.x*2-1 && s[i] && s[i]!=13 && s[i]!=10;i++) cur[0].map[i][j]=s[i];
+				for(;i<info.x*2-1;i++) cur[0].map[i][j]=' ';
+				cur[0].map[i][j]=0;
 			}
 		} else {
 			printf("ignored unknown command %s\n",t);
@@ -230,7 +231,7 @@ mapended:
 	starts=0; goals=0;
 	info.goalx=info.goaly=-1;
 	for(int i=0;i<info.x;i++) for(int j=0;j<info.y;j++) {
-		char c=cur.map[i*2][j*2];
+		char c=cur[0].map[i*2][j*2];
 		if(c!=' ' && c!='*' && !isstump(c) && c!='-' && c!='|') error("illegal stump");
 		if(c=='S') starts++;
 		if(c=='T') {
@@ -246,23 +247,23 @@ mapended:
 	for(i=0;i<MAX;i++) info.planklen[i]=0;
 	info.stumps=0;
 	for(i=0;i<info.x;i++) for(int j=0;j<info.y;j++) {
-		if(isstump(cur.map[i*2][j*2])) {
+		if(isstump(cur[0].map[i*2][j*2])) {
 			/* preserve man pos */
-			if(cur.map[i*2][j*2]=='S') cur.manpos=info.stumps;
+			if(cur[0].map[i*2][j*2]=='S') cur[0].manpos=info.stumps;
 			/* convert start and end stumps to generic ones */
-			cur.map[i*2][j*2]='*';
+			cur[0].map[i*2][j*2]='*';
 			info.stumpx[info.stumps]=i;
 			info.stumpy[info.stumps]=j;
 			info.stumpix[i][j]=info.stumps++;
-			info.planklen[scanplank(i,j,0,'-')]++;
-			info.planklen[scanplank(i,j,1,'|')]++;
+			info.planklen[scanplank(i,j,0,'-',0)]++;
+			info.planklen[scanplank(i,j,1,'|',0)]++;
 		}
 	}
 	/* find all possible bridges */
 	for(i=0;i<MAX;i++) info.bridgen[i]=0;
-	for(i=0;i<info.x;i++) for(j=0;j<info.y;j++) if(isstump(cur.map[i*2][j*2])) for(int d=0;d<2;d++) {
+	for(i=0;i<info.x;i++) for(j=0;j<info.y;j++) if(isstump(cur[0].map[i*2][j*2])) for(int d=0;d<2;d++) {
 		/* follow bridge and find length */
-		int len=scanbridge(i,j,d);
+		int len=scanbridge(i,j,d,0);
 		if(len>-1) {
 //			printf("%d %d %d: found length %d\n",i,j,d,len);
 			info.bx[len][info.bridgen[len]]=i;
@@ -270,7 +271,7 @@ mapended:
 			info.bd[len][info.bridgen[len]++]=d;
 		}
 	}
-	print_state();
+	print_state(0);
 	/* calculate state space size */
 	/* for each bridge size: there are (n choose k) ways to place k bridges,
 	   where n is the number of bridge spots + 1 for inventory.
@@ -289,29 +290,29 @@ mapended:
 }
 
 unsigned char *domain_size() {
-	return getptr(info.dsize-1);
+	return getptr(info.dsize-1,0);
 }
 
 int state_size() {
 	return info.slen;
 }
 
-void print_state() {
+void print_state(int thr) {
 	int i,j;
 	for(j=0;j<info.y*2-1;j++) {
 		for(i=0;i<info.x*2-1;i++) {
-			if(i==info.stumpx[cur.manpos]*2 && j==info.stumpy[cur.manpos]*2) putchar('@');
-			else putchar(cur.map[i][j]);
+			if(i==info.stumpx[cur[thr].manpos]*2 && j==info.stumpy[cur[thr].manpos]*2) putchar('@');
+			else putchar(cur[thr].map[i][j]);
 		}
 		putchar('\n');
 	}
 	printf("inventory: ");
-	if(cur.inventory) printf("length %d plank\n",cur.inventory);
+	if(cur[thr].inventory) printf("length %d plank\n",cur[thr].inventory);
 	else puts("nothing");
 	putchar('\n');
 }
 
-unsigned char *encode_state() {
+unsigned char *encode_state(int thr) {
 	statetype v=0;
 //	puts("encode start");
 //	print_state();
@@ -319,7 +320,7 @@ unsigned char *encode_state() {
 	for(int i=1;i<MAXPL;i++) if(info.planklen[i]>0) {
 		counts[0]=counts[1]=plen=0;
 		for(int j=0;j<info.bridgen[i];j++) {
-			if(isbridge(cur.map[info.bx[i][j]*2+dx[info.bd[i][j]]][info.by[i][j]*2+dy[info.bd[i][j]]])) {
+			if(isbridge(cur[thr].map[info.bx[i][j]*2+dx[info.bd[i][j]]][info.by[i][j]*2+dy[info.bd[i][j]]])) {
 				multiset[plen++]=1;
 				counts[1]++;
 			} else {
@@ -327,7 +328,7 @@ unsigned char *encode_state() {
 				counts[0]++;
 			}
 		}
-		if(i==cur.inventory) {
+		if(i==cur[thr].inventory) {
 			multiset[plen++]=1;
 			counts[1]++;
 		} else {
@@ -342,23 +343,23 @@ unsigned char *encode_state() {
 	/* man position */
 	/* TODO normalize man position with bfs/dfs (will reduce iteration size) */
 	/* TODO prioritize goal position when reachable (or won() won't work) */
-	v*=info.stumps; v+=cur.manpos;
+	v*=info.stumps; v+=cur[thr].manpos;
 	if(v>=info.dsize) printf("sanity error, state value exceeds state space size\n");
 //	printf("encode %I64d\n",v);
-	return getptr(v);
+	return getptr(v,thr);
 }
 
-void decode_state(unsigned char *p) {
+void decode_state(unsigned char *p,int thr) {
 	statetype v=getval(p);
 //	printf("decode %I64d\n",v);
-	cur.inventory=0;
+	cur[thr].inventory=0;
 	/* erase all planks from ascii map */
 	for(int i=0;i<info.x*2-1;i++) for(int j=0;j<info.y*2-1;j++) {
-		char c=cur.map[i][j];
-		if(c=='|' || c=='-') cur.map[i][j]=' ';
+		char c=cur[thr].map[i][j];
+		if(c=='|' || c=='-') cur[thr].map[i][j]=' ';
 	}
 	/* man pos */
-	cur.manpos=v%info.stumps; v/=info.stumps;
+	cur[thr].manpos=v%info.stumps; v/=info.stumps;
 //	printf("  v=%I64d\n",v);
 	/* decode planks */
 	for(int i=MAXPL-1;i;i--) if(info.planklen[i]>0) {
@@ -371,61 +372,61 @@ void decode_state(unsigned char *p) {
 //		printf("% I64d\n",pas[plen][counts[1]]);
 		for(int j=0;j<info.bridgen[i];j++) if(multiset[j]) {
 			/* draw ascii bridge */
-			if(!drawbridge(info.bx[i][j],info.by[i][j],info.bd[i][j])) puts("sanity error, overlapping bridge");
+			if(!drawbridge(info.bx[i][j],info.by[i][j],info.bd[i][j],thr)) puts("sanity error, overlapping bridge");
 		}
-		if(multiset[plen-1]) cur.inventory=i;
+		if(multiset[plen-1]) cur[thr].inventory=i;
 	}
 //	puts("decode end");
 //	print_state();
 }
 
-int won() {
-	return info.goalx==info.stumpx[cur.manpos] && info.goaly==info.stumpy[cur.manpos];
+int won(int thr) {
+	return info.goalx==info.stumpx[cur[thr].manpos] && info.goaly==info.stumpy[cur[thr].manpos];
 }
 
 static char vis[MAX][MAX];
 static int q[MAX*MAX];
 static int qs,qe;
 
-void visit_neighbours() {
+void visit_neighbours(int thr) {
 	/* try all man moves with bfs */
 	memset(vis,0,sizeof(vis));
 	qs=qe=0;
 	/* push man pos */
-	q[qe++]=cur.manpos;
-	vis[info.stumpx[cur.manpos]][info.stumpy[cur.manpos]]=1;
+	q[qe++]=cur[thr].manpos;
+	vis[info.stumpx[cur[thr].manpos]][info.stumpy[cur[thr].manpos]]=1;
 	while(qs<qe) {
-		cur.manpos=q[qs++];
-		int curx=info.stumpx[cur.manpos];
-		int cury=info.stumpy[cur.manpos];
-		if(cur.inventory) {
+		cur[thr].manpos=q[qs++];
+		int curx=info.stumpx[cur[thr].manpos];
+		int cury=info.stumpy[cur[thr].manpos];
+		if(cur[thr].inventory) {
 			/* try all ways of dropping held bridge */
 			for(int d=0;d<4;d++) {
 				int x2=curx*2+dx[d];
 				int y2=cury*2+dy[d];
 				if(x2<0 || y2<0 || x2>=info.x*2-1 || y2>=info.y*2-1) continue;
-				if(isbridge(cur.map[x2][y2])) continue;
+				if(isbridge(cur[thr].map[x2][y2]),thr) continue;
 				/* scan for stump and check if length equals bridge length */
 				x2=curx+dx[d];
 				y2=cury+dy[d];
 				int len=1;
-				while(x2>=0 && y2>=0 && x2<info.x && y2<info.y && !isstump(cur.map[x2*2][y2*2])) {
+				while(x2>=0 && y2>=0 && x2<info.x && y2<info.y && !isstump(cur[thr].map[x2*2][y2*2])) {
 					x2+=dx[d];
 					y2+=dy[d];
 					len++;
 				}
 				if(x2<0 || y2<0 || x2>=info.x || y2>=info.y) continue;
 //				printf("at %d %d dir %d, found bridge of length %d\n",curx,cury,d,len);
-				if(len!=cur.inventory) continue;
+				if(len!=cur[thr].inventory) continue;
 				/* bridge is ok */
-				struct state_s bak=cur;
-				cur.inventory=0;
-				if(drawbridge(curx,cury,d)) {
+				struct state_s bak=cur[thr];
+				cur[thr].inventory=0;
+				if(drawbridge(curx,cury,d,thr)) {
 //					puts("dropped bridge");
 //					print_state();
-					add_child(encode_state());
+					add_child(encode_state(thr),thr);
 				}
-				cur=bak;
+				cur[thr]=bak;
 			}
 		} else {
 			/* try all ways of picking up a bridge next to player */
@@ -433,23 +434,23 @@ void visit_neighbours() {
 				int x2=curx*2+dx[d];
 				int y2=cury*2+dy[d];
 				if(x2<0 || y2<0 || x2>=info.x*2-1 || y2>=info.y*2-1) continue;
-				if(!isbridge(cur.map[x2][y2])) continue;
-				int len=scanbridge(curx,cury,d);
+				if(!isbridge(cur[thr].map[x2][y2])) continue;
+				int len=scanbridge(curx,cury,d,thr);
 				if(len<0) printf("sanity error\n");
-				struct state_s bak=cur;
+				struct state_s bak=cur[thr];
 				/* remove bridge from ascii and put it in inventory */
-				cur.inventory=len;
-				while(isbridge(cur.map[x2][y2])) {
-					cur.map[x2][y2]=' ';
+				cur[thr].inventory=len;
+				while(isbridge(cur[thr].map[x2][y2])) {
+					cur[thr].map[x2][y2]=' ';
 					x2+=dx[d];
 					y2+=dy[d];
 					if(x2<0 || y2<0 || x2>=info.x*2-1 || y2>=info.y*2-1) puts("sanity error while removing bridge");
 				}
-				if(!isstump(cur.map[x2][y2])) puts("sanity error, remove bridge didn't end up at stump");
+				if(!isstump(cur[thr].map[x2][y2])) puts("sanity error, remove bridge didn't end up at stump");
 //				puts("picked up bridge");
 //				print_state();
-				add_child(encode_state());
-				cur=bak;
+				add_child(encode_state(thr),thr);
+				cur[thr]=bak;
 			}
 		}
 		/* move over bridges to nearby stumps */
@@ -457,13 +458,13 @@ void visit_neighbours() {
 			int x2=curx*2+dx[d];
 			int y2=cury*2+dy[d];
 			if(x2<0 || y2<0 || x2>=info.x*2-1 || y2>=info.y*2-1) continue;
-			if(!isbridge(cur.map[x2][y2])) continue;
+			if(!isbridge(cur[thr].map[x2][y2])) continue;
 			/* find endpoint of bridge */
-			int len=scanbridge(curx,cury,d);
+			int len=scanbridge(curx,cury,d,thr);
 			if(len<0) printf("sanity error\n");
 			x2=curx+dx[d]*len;
 			y2=cury+dy[d]*len;
-			if(!isstump(cur.map[x2*2][y2*2])) printf("no stump\n");
+			if(!isstump(cur[thr].map[x2*2][y2*2])) printf("no stump\n");
 			if(vis[x2][y2]) continue;
 			vis[x2][y2]=1;
 			int next=info.stumpix[x2][y2];

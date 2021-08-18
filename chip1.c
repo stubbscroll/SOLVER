@@ -111,7 +111,7 @@ static struct options_s {
 
 static struct state_s {
 	char map[MAX][MAX];
-} cur;
+} cur[MAXTHR];
 
 static void error(char *s) { puts(s); exit(1); }
 
@@ -123,12 +123,13 @@ static statetype getval(unsigned char *p) {
 	return n;
 }
 
+static unsigned char p[MAXTHR][16];
+
 /* convert statetype to pointer-thing */
-static unsigned char *getptr(statetype v) {
-	static unsigned char p[16];
+static unsigned char *getptr(statetype v,int thr) {
 	int i;
-	for(i=0;i<info.slen;i++) p[i]=v&255,v>>=8;
-	return p;
+	for(i=0;i<info.slen;i++) p[thr][i]=v&255,v>>=8;
+	return p[thr];
 }
 
 /* ----- state representation: permutation rank ---------------------------- */
@@ -266,7 +267,7 @@ void domain_init() {
 	options.skipndeadlock=0;
 	options.skipgoaldeadlock=0;
 	memset(info.smap,0,sizeof(info.smap));
-	memset(cur.map,0,sizeof(cur.map));
+	memset(cur[0].map,0,sizeof(cur[0].map));
 	while(fgets(s,998,stdin)) {
 		if(s[0]=='#') continue; /* non-map line starting with #: comment */
 		if(s[0]==13 || s[0]==10) continue; /* blank line */
@@ -286,21 +287,21 @@ void domain_init() {
 				if(!fgets(s,998,stdin)) error("map ended unexpectedly");
 				for(i=0;i<info.x;i++) {
 					c=s[i];
-					if(c=='#') info.smap[i][j]='#',cur.map[i][j]='#';
-					else if(c==' ') info.smap[i][j]=' ',cur.map[i][j]=' ';
-					else if(c=='.') info.smap[i][j]='.',cur.map[i][j]=' ';
-					else if(c=='$') info.smap[i][j]=' ',cur.map[i][j]='$';
-					else if(c=='_') info.smap[i][j]='_',cur.map[i][j]=' ';
-					else if(c=='*') info.smap[i][j]='.',cur.map[i][j]='$';
-					else if(c=='@') info.smap[i][j]=' ',cur.map[i][j]='@';
-					else if(c=='+') info.smap[i][j]='.',cur.map[i][j]='@';
-					else if(c=='=') info.smap[i][j]='_',cur.map[i][j]='@';
-					else if(c=='g') info.smap[i][j]=' ',cur.map[i][j]=' ',info.goalx=i,info.goaly=j;
-					else if(c=='o') info.smap[i][j]='_',cur.map[i][j]='o';
-					else if(c=='<') info.smap[i][j]='<',cur.map[i][j]=' ';
-					else if(c=='>') info.smap[i][j]='>',cur.map[i][j]=' ';
-					else if(c=='^') info.smap[i][j]='^',cur.map[i][j]=' ';
-					else if(c=='v') info.smap[i][j]='v',cur.map[i][j]=' ';
+					if(c=='#') info.smap[i][j]='#',cur[0].map[i][j]='#';
+					else if(c==' ') info.smap[i][j]=' ',cur[0].map[i][j]=' ';
+					else if(c=='.') info.smap[i][j]='.',cur[0].map[i][j]=' ';
+					else if(c=='$') info.smap[i][j]=' ',cur[0].map[i][j]='$';
+					else if(c=='_') info.smap[i][j]='_',cur[0].map[i][j]=' ';
+					else if(c=='*') info.smap[i][j]='.',cur[0].map[i][j]='$';
+					else if(c=='@') info.smap[i][j]=' ',cur[0].map[i][j]='@';
+					else if(c=='+') info.smap[i][j]='.',cur[0].map[i][j]='@';
+					else if(c=='=') info.smap[i][j]='_',cur[0].map[i][j]='@';
+					else if(c=='g') info.smap[i][j]=' ',cur[0].map[i][j]=' ',info.goalx=i,info.goaly=j;
+					else if(c=='o') info.smap[i][j]='_',cur[0].map[i][j]='o';
+					else if(c=='<') info.smap[i][j]='<',cur[0].map[i][j]=' ';
+					else if(c=='>') info.smap[i][j]='>',cur[0].map[i][j]=' ';
+					else if(c=='^') info.smap[i][j]='^',cur[0].map[i][j]=' ';
+					else if(c=='v') info.smap[i][j]='v',cur[0].map[i][j]=' ';
 					else printf("illegal char %d\n",c),exit(1);
 				}
 			}
@@ -325,18 +326,18 @@ void domain_init() {
 			info.idy[info.floor]=j;
 			info.idmap[i][j]=info.floor++;
 		}
-		if(cur.map[i][j]=='o') {
+		if(cur[0].map[i][j]=='o') {
 			info.idpx[info.popup]=i;
 			info.idpy[info.popup++]=j;
 		}
 		if(info.smap[i][j]=='.') goals++;
-		if(cur.map[i][j]=='@') men++;
-		if(cur.map[i][j]=='$') info.blocks++;
+		if(cur[0].map[i][j]=='@') men++;
+		if(cur[0].map[i][j]=='$') info.blocks++;
 	}
 	if(men!=1) error("map must contain 1 man");
 	if(goals!=info.blocks) error("map must contain same number of blocks and destinations");
 	if(!goals) error("map must contain at least 1 block");
-	for(i=0;i<info.x;i++) for(j=0;j<info.y;j++) if(cur.map[i][j]=='$' && info.id2map[i][j]<0)
+	for(i=0;i<info.x;i++) for(j=0;j<info.y;j++) if(cur[0].map[i][j]=='$' && info.id2map[i][j]<0)
 		error("illegal start config, block starts on dead space");
 	/* find goal corridor */
 	if(!options.skipgoaldeadlock) findgoalcorridor();
@@ -351,7 +352,7 @@ void domain_init() {
 }
 
 unsigned char *domain_size() {
-	return getptr(info.dsize-1);
+	return getptr(info.dsize-1,0);
 }
 
 int state_size() {
@@ -360,27 +361,27 @@ int state_size() {
 
 /* this doesn't currently output _ correctly, because the dead space search
    overwrote them with d. care about it later */
-void print_state() {
+void print_state(int thr) {
 	int i,j;
 	for(j=0;j<info.y;j++) {
 		for(i=0;i<info.x;i++) {
-			if(cur.map[i][j]==' ' && info.smap[i][j]=='_') putchar('_');
-			else if(cur.map[i][j]==' ' && info.smap[i][j]=='.') putchar('.');
+			if(cur[thr].map[i][j]==' ' && info.smap[i][j]=='_') putchar('_');
+			else if(cur[thr].map[i][j]==' ' && info.smap[i][j]=='.') putchar('.');
 			else if(isforcefloor(i,j)) putchar(info.smap[i][j]);
-			else putchar(cur.map[i][j]);
+			else putchar(cur[thr].map[i][j]);
 		}
 		putchar('\n');
 	}
 	putchar('\n');
 }
 
-unsigned char *encode_state() {
+unsigned char *encode_state(int thr) {
 	statetype v=0;
 	int i,j,k;
 	/* find man: count number of floor (dead or live) before man */
 	for(v=j=0;j<info.y;j++) for(i=0;i<info.x;i++) {
-		if(cur.map[i][j]=='@') goto foundman;
-		else if(cur.map[i][j]=='$') continue;
+		if(cur[thr].map[i][j]=='@') goto foundman;
+		else if(cur[thr].map[i][j]=='$') continue;
 		else if(info.smap[i][j]=='#') continue;
 		else if(isforcefloor(i,j)) continue;
 		v++;
@@ -391,28 +392,28 @@ foundman:
 	for(k=0;k<info.lfloor;k++) {
 		i=info.id2x[k];
 		j=info.id2y[k];
-		if(cur.map[i][j]==' ' || cur.map[i][j]=='@') counts[0]++,multiset[plen++]=0;
-		else if(cur.map[i][j]=='$') counts[1]++,multiset[plen++]=1;
+		if(cur[thr].map[i][j]==' ' || cur[thr].map[i][j]=='@') counts[0]++,multiset[plen++]=0;
+		else if(cur[thr].map[i][j]=='$') counts[1]++,multiset[plen++]=1;
 	}
 	v+=permrank()*(info.floor-info.blocks);
 	/* popup walls */
 	for(i=info.popup-1;i>=0;i--) {
-		char c=cur.map[info.idpx[i]][info.idpy[i]];
+		char c=cur[thr].map[info.idpx[i]][info.idpy[i]];
 		/* set bit to 1 (popup wall is wall) if tile contains wall or man or
 		   floor (floor means we walked off the tile) */
 		v=(v<<1)+(c=='#' || c=='@' || c==' ' || c=='_');
 	}
-	return getptr(v);
+	return getptr(v,thr);
 }
 
-void decode_state(unsigned char *p) {
+void decode_state(unsigned char *p,int thr) {
 	statetype v=getval(p);
 	int i,j,k,w,l;
 	/* clear map */
-	for(i=0;i<info.floor;i++) cur.map[info.idx[i]][info.idy[i]]=' ';
+	for(i=0;i<info.floor;i++) cur[thr].map[info.idx[i]][info.idy[i]]=' ';
 	/* read popup walls */
 	for(i=0;i<info.popup;i++) {
-		cur.map[info.idpx[i]][info.idpy[i]]=(v&1)?'#':'o';
+		cur[thr].map[info.idpx[i]][info.idpy[i]]=(v&1)?'#':'o';
 		v>>=1;
 	}
 	/* extract man, but don't place him yet */
@@ -425,54 +426,54 @@ void decode_state(unsigned char *p) {
 	for(k=l=0;k<info.lfloor;k++) {
 		i=info.id2x[k];
 		j=info.id2y[k];
-		cur.map[i][j]=multiset[l++]?'$':' ';
+		cur[thr].map[i][j]=multiset[l++]?'$':' ';
 	}
 	for(j=0;j<info.y;j++) for(i=0;i<info.x;i++) {
-		if(info.smap[i][j]=='#' || cur.map[i][j]=='$' || isforcefloor(i,j)) continue;
+		if(info.smap[i][j]=='#' || cur[thr].map[i][j]=='$' || isforcefloor(i,j)) continue;
 		if(w--<1) {
-			cur.map[i][j]='@';
+			cur[thr].map[i][j]='@';
 			goto manplaced;
 		}
 	}
 manplaced:;
 }
 
-int won() {
+int won(int thr) {
 	int i,j;
-	for(i=0;i<info.x;i++) for(j=0;j<info.y;j++) if(info.smap[i][j]=='.' && cur.map[i][j]!='$') return 0;
-	if(info.goalx>-1 && info.goaly>-1 && cur.map[info.goalx][info.goaly]!='@') return 0;
+	for(i=0;i<info.x;i++) for(j=0;j<info.y;j++) if(info.smap[i][j]=='.' && cur[thr].map[i][j]!='$') return 0;
+	if(info.goalx>-1 && info.goaly>-1 && cur[thr].map[info.goalx][info.goaly]!='@') return 0;
 	return 1;
 }
 
 /* return 1 if tile (i,j) has an acting wall */
 /* popped-up walls are stored in a different array from normal walls */
-static int iswall(int i,int j) {
-	return info.smap[i][j]=='#' || cur.map[i][j]=='#';
+static int iswall(int i,int j,int thr) {
+	return info.smap[i][j]=='#' || cur[thr].map[i][j]=='#';
 }
 
 /* check for 2x2 deadlock with blocks+wall */
-static int bad2x2v2() {
+static int bad2x2v2(int thr) {
 	for(int i=0;i<info.x-1;i++) for(int j=0;j<info.y-1;j++) {
 		/* no blocks, no deadlock */
-		if(cur.map[i][j]!='$' && cur.map[i+1][j]!='$' && cur.map[i][j+1]!='$' && cur.map[i+1][j+1]!='$') continue;
+		if(cur[thr].map[i][j]!='$' && cur[thr].map[i+1][j]!='$' && cur[thr].map[i][j+1]!='$' && cur[thr].map[i+1][j+1]!='$') continue;
 		/* insta-reject trivial case with 4 walls */
-		if(iswall(i,j) && iswall(i+1,j) && iswall(i,j+1) && iswall(i+1,j+1)) continue;
+		if(iswall(i,j,thr) && iswall(i+1,j,thr) && iswall(i,j+1,thr) && iswall(i+1,j+1,thr)) continue;
 		int badblock=0;
 		/* every cell in 2x2 must have block or wall and at least one block not on goal */
-		if(iswall(i,j));
-		else if(cur.map[i][j]=='$') {
+		if(iswall(i,j,thr));
+		else if(cur[thr].map[i][j]=='$') {
 			if(info.smap[i][j]!='.') badblock++;
 		} else continue;
-		if(iswall(i+1,j));
-		else if(cur.map[i+1][j]=='$') {
+		if(iswall(i+1,j,thr));
+		else if(cur[thr].map[i+1][j]=='$') {
 			if(info.smap[i+1][j]!='.') badblock++;
 		} else continue;
-		if(iswall(i,j+1));
-		else if(cur.map[i][j+1]=='$') {
+		if(iswall(i,j+1,thr));
+		else if(cur[thr].map[i][j+1]=='$') {
 			if(info.smap[i][j+1]!='.') badblock++;
 		} else continue;
-		if(iswall(i+1,j+1));
-		else if(cur.map[i+1][j+1]=='$') {
+		if(iswall(i+1,j+1,thr));
+		else if(cur[thr].map[i+1][j+1]=='$') {
 			if(info.smap[i+1][j+1]!='.') badblock++;
 		} else continue;
 		if(badblock) return 1;
@@ -487,14 +488,14 @@ static int bad2x2v2() {
 /* TODO can optimize further by precalculating a list of (x,y) coordinates
    where this wall pattern occurs, and that have live non-destination cells,
    and check only these */
-static int badnhor1() {
+static int badnhor1(int thr) {
 	for(int i=0;i<info.x-2;i++) for(int j=0;j<info.y-1;j++) {
 		/* walls not in place, deadlock not possible */
-		if(!iswall(i,j) || !iswall(i+2,j+1)) continue;
+		if(!iswall(i,j,thr) || !iswall(i+2,j+1,thr)) continue;
 		/* blocks not in place, deadlock not possible */
 		/* if any of there were walls, the block would be on a dead space and
 		   the state would be rejected earlier */
-		if(cur.map[i+1][j]!='$' || cur.map[i+1][j+1]!='$') continue;
+		if(cur[thr].map[i+1][j]!='$' || cur[thr].map[i+1][j+1]!='$') continue;
 		/* reject if one of the blocks is not on goal */
 		if(info.smap[i+1][j]!='.' || info.smap[i+1][j+1]!='.') return 1;
 	}
@@ -504,14 +505,14 @@ static int badnhor1() {
 /* check for  $#
              #$
 */
-static int badnhor2() {
+static int badnhor2(int thr) {
 	for(int i=0;i<info.x-2;i++) for(int j=0;j<info.y-1;j++) {
 		/* walls not in place, deadlock not possible */
-		if(!iswall(i,j+1) || !iswall(i+2,j)) continue;
+		if(!iswall(i,j+1,thr) || !iswall(i+2,j,thr)) continue;
 		/* blocks not in place, deadlock not possible */
 		/* if any of there were walls, the block would be on a dead space and
 		   the state would be rejected earlier */
-		if(cur.map[i+1][j]!='$' || cur.map[i+1][j+1]!='$') continue;
+		if(cur[thr].map[i+1][j]!='$' || cur[thr].map[i+1][j+1]!='$') continue;
 		/* reject if one of the blocks is not on goal */
 		if(info.smap[i+1][j]!='.' || info.smap[i+1][j+1]!='.') return 1;
 	}
@@ -522,14 +523,14 @@ static int badnhor2() {
              $$
               #
 */
-static int badnver1() {
+static int badnver1(int thr) {
 	for(int i=0;i<info.x-1;i++) for(int j=0;j<info.y-2;j++) {
 		/* walls not in place, deadlock not possible */
-		if(!iswall(i,j) || !iswall(i+1,j+2)) continue;
+		if(!iswall(i,j,thr) || !iswall(i+1,j+2,thr)) continue;
 		/* blocks not in place, deadlock not possible */
 		/* if any of there were walls, the block would be on a dead space and
 		   the state would be rejected earlier */
-		if(cur.map[i][j+1]!='$' || cur.map[i+1][j+1]!='$') continue;
+		if(cur[thr].map[i][j+1]!='$' || cur[thr].map[i+1][j+1]!='$') continue;
 		/* reject if one of the blocks is not on goal */
 		if(info.smap[i][j+1]!='.' || info.smap[i+1][j+1]!='.') return 1;
 	}
@@ -540,21 +541,21 @@ static int badnver1() {
              $$
              #
 */
-static int badnver2() {
+static int badnver2(int thr) {
 	for(int i=0;i<info.x-1;i++) for(int j=0;j<info.y-2;j++) {
 		/* walls not in place, deadlock not possible */
-		if(!iswall(i+1,j) || !iswall(i,j+2)) continue;
+		if(!iswall(i+1,j,thr) || !iswall(i,j+2,thr)) continue;
 		/* blocks not in place, deadlock not possible */
 		/* if any of there were walls, the block would be on a dead space and
 		   the state would be rejected earlier */
-		if(cur.map[i][j+1]!='$' || cur.map[i+1][j+1]!='$') continue;
+		if(cur[thr].map[i][j+1]!='$' || cur[thr].map[i+1][j+1]!='$') continue;
 		/* reject if one of the blocks is not on goal */
 		if(info.smap[i][j+1]!='.' || info.smap[i+1][j+1]!='.') return 1;
 	}
 	return 0;
 }
 
-static int hasgoaldeadlock() {
+static int hasgoaldeadlock(int thr) {
 	if(!info.hascorridor) return 0;
 	/* count number of blocks */
 	int x2=info.corridorx,y2=info.corridory;
@@ -564,26 +565,26 @@ static int hasgoaldeadlock() {
 	   i believe this is sufficient to catch all goal deadlocks and
 	   inefficiencies */
 	for(int i=0;i<len-2;i++) {
-		if(cur.map[x2+(i+0)*dx[d]][y2+(i+0)*dy[d]]==' ' &&
-		   cur.map[x2+(i+1)*dx[d]][y2+(i+1)*dy[d]]=='$' &&
-		   cur.map[x2+(i+2)*dx[d]][y2+(i+2)*dy[d]]==' ') return 1;
+		if(cur[thr].map[x2+(i+0)*dx[d]][y2+(i+0)*dy[d]]==' ' &&
+		   cur[thr].map[x2+(i+1)*dx[d]][y2+(i+1)*dy[d]]=='$' &&
+		   cur[thr].map[x2+(i+2)*dx[d]][y2+(i+2)*dy[d]]==' ') return 1;
 	}
 	return 0;
 }
 
-static int deadpos2() {
+static int deadpos2(int thr) {
 	/* check for 2x2 configurations of wall/block where >=1 block is not on goal */
-	if(bad2x2v2()) return 1;
+	if(bad2x2v2(thr)) return 1;
 	/* check for N-pattern */
 	if(!options.skipndeadlock) {
-		if(badnhor1()) return 1;
-		if(badnhor2()) return 1;
-		if(badnver1()) return 1;
-		if(badnver2()) return 1;
+		if(badnhor1(thr)) return 1;
+		if(badnhor2(thr)) return 1;
+		if(badnver1(thr)) return 1;
+		if(badnver2(thr)) return 1;
 	}
 	/* check for blocks not pushed fully in the goal corridor */
 	if(!options.skipgoaldeadlock) {
-		if(hasgoaldeadlock()) return 1;
+		if(hasgoaldeadlock(thr)) return 1;
 	}
 	return 0;
 }
@@ -603,49 +604,49 @@ static void followforcefloor(int *i,int *j,int *d) {
 	}
 }
 
-void visit_neighbours() {
+void visit_neighbours(int thr) {
 	int cx=0,cy=0,i,j,d,x2,y2,x3,y3;
 	/* find man */
-	for(i=0;i<info.x;i++) for(j=0;j<info.y;j++) if(cur.map[i][j]=='@') cx=i,cy=j;
+	for(i=0;i<info.x;i++) for(j=0;j<info.y;j++) if(cur[thr].map[i][j]=='@') cx=i,cy=j;
 	for(d=0;d<4;d++) {
 		x2=cx+dx[d]; y2=cy+dy[d];
-		if(x2<0 || y2<0 || x2>=info.x || y2>=info.y || iswall(x2,y2)) continue;
+		if(x2<0 || y2<0 || x2>=info.x || y2>=info.y || iswall(x2,y2,thr)) continue;
 		int d2=d;
 		if(isforcefloor(x2,y2)) followforcefloor(&x2,&y2,&d2);
 		/* special case: we move to the tile we came from: ignore the move */
 		if(cx==x2 && cy==y2) continue;
-		char bak=cur.map[x2][y2]; /* preserve status of popup wall */
-		if(cur.map[x2][y2]==' ' || cur.map[x2][y2]=='o') {
+		char bak=cur[thr].map[x2][y2]; /* preserve status of popup wall */
+		if(cur[thr].map[x2][y2]==' ' || cur[thr].map[x2][y2]=='o') {
 			/* move man */
-			cur.map[cx][cy]=' ';
-			cur.map[x2][y2]='@';
-			if(!deadpos2()) add_child(encode_state());
-			cur.map[cx][cy]='@';
-			cur.map[x2][y2]=bak;
-		} else if(cur.map[x2][y2]=='$') {
+			cur[thr].map[cx][cy]=' ';
+			cur[thr].map[x2][y2]='@';
+			if(!deadpos2(thr)) add_child(encode_state(thr),thr);
+			cur[thr].map[cx][cy]='@';
+			cur[thr].map[x2][y2]=bak;
+		} else if(cur[thr].map[x2][y2]=='$') {
 			x3=x2+dx[d2]; y3=y2+dy[d2];
-			if(x3<0 || y3<0 || x3>=info.x || y3>=info.y || iswall(x3,y3) || info.smap[x3][y3]=='_' || info.smap[x3][y3]=='d' || cur.map[x3][y3]!=' ') continue;
+			if(x3<0 || y3<0 || x3>=info.x || y3>=info.y || iswall(x3,y3,thr) || info.smap[x3][y3]=='_' || info.smap[x3][y3]=='d' || cur[thr].map[x3][y3]!=' ') continue;
 			int d3=d2;
 			if(isforcefloor(x3,y3)) followforcefloor(&x3,&y3,&d3);
-			if(iswall(x3,y3) || info.smap[x3][y3]=='_' || info.smap[x3][y3]=='d' || cur.map[x3][y3]!=' ') continue;
+			if(iswall(x3,y3,thr) || info.smap[x3][y3]=='_' || info.smap[x3][y3]=='d' || cur[thr].map[x3][y3]!=' ') continue;
 			/* check special case 1: we get whacked by the block we just pushed */
 			if(x2==x3 && y2==y3) continue;
 			/* check special case 2: we push block to the tile we moved from */
 			if(cx==x3 && cy==y3) {
-				cur.map[cx][cy]='$';
-				cur.map[x2][y2]='@';
-				if(!deadpos2()) add_child(encode_state());
-				cur.map[cx][cy]='@';
-				cur.map[x2][y2]='$';
+				cur[thr].map[cx][cy]='$';
+				cur[thr].map[x2][y2]='@';
+				if(!deadpos2(thr)) add_child(encode_state(thr),thr);
+				cur[thr].map[cx][cy]='@';
+				cur[thr].map[x2][y2]='$';
 			} else {
 				/* normal case: push the block normally, all relevant tiles are different */
-				cur.map[cx][cy]=' ';
-				cur.map[x2][y2]='@';
-				cur.map[x3][y3]='$';
-				if(!deadpos2()) add_child(encode_state());
-				cur.map[cx][cy]='@';
-				cur.map[x2][y2]='$';
-				cur.map[x3][y3]=' ';
+				cur[thr].map[cx][cy]=' ';
+				cur[thr].map[x2][y2]='@';
+				cur[thr].map[x3][y3]='$';
+				if(!deadpos2(thr)) add_child(encode_state(thr),thr);
+				cur[thr].map[cx][cy]='@';
+				cur[thr].map[x2][y2]='$';
+				cur[thr].map[x3][y3]=' ';
 			}
 		}
 	}

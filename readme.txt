@@ -9,8 +9,9 @@ algorithms implemented:
 - bfs - simple breadth-first search (state space must fit in memory)
 - bfsd - bfs with delayed duplicate detection (in progress)
 - bfsdu - bfs (for undirected graphs) with delayed duplicate detection
-- bfs2 - breadth-first search with disk swapping (requires bitmask of state
+- bfs2 - breadth-first search with disk swapping (requires bit array of state
   space in memory)
+- bfs2p - multithreaded version of bfs2
 
 domains implemented:
 - npuzzle (undirected, bipartite) - (mn-1)-puzzle (aka 15-puzzle)
@@ -19,11 +20,13 @@ domains implemented:
 - soko2 - sokoban, checks for simple deadlocks, better encoding
 - soko3 - sokoban, same as soko2 but with block slapping (feature in chip's
   challenge for lynx and steam)
+- plank (undirected) - plank puzzle
 
 puzzle instances:
 - npuzzle/ - puzzles for n-puzzle
 - chip/ - puzzles for chip1
 - soko/ - puzzles for soko, soko2, soko3
+- plank/ - puzzles for plank
 
 to come later:
 - improved bfs: vbyte compression, search from both directions (requires

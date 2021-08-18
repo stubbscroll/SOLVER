@@ -54,7 +54,7 @@ static struct static_s {
 
 static struct state_s {
 	int map[MAX][MAX];
-} cur;
+} cur[MAXTHR];
 
 static void error(char *s) { puts(s); exit(1); }
 
@@ -66,23 +66,24 @@ static statetype getval(unsigned char *p) {
 	return n;
 }
 
+static unsigned char p[MAXTHR][16];
+
 /* convert statetype to pointer-thing */
-static unsigned char *getptr(statetype v) {
-	static unsigned char p[16];
+static unsigned char *getptr(statetype v,int thr) {
 	int i;
-	for(i=0;i<info.slen;i++) p[i]=v&255,v>>=8;
-	return p;
+	for(i=0;i<info.slen;i++) p[thr][i]=v&255,v>>=8;
+	return p[thr];
 }
 
 /* check if current state is solvable
    solvable iff parity of permutation + parity of manhattan distance of blank
    tile to lower right is even */
-static int issolvable() {
+static int issolvable(int thr) {
 	int i,j,k,cab=0,parity=0,perm[MAX*MAX],len;
 	/* find zero */
-	for(i=0;i<info.x;i++) for(j=0;j<info.y;j++) if(!cur.map[i][j]) cab=info.x+info.y-i-j-2;
+	for(i=0;i<info.x;i++) for(j=0;j<info.y;j++) if(!cur[thr].map[i][j]) cab=info.x+info.y-i-j-2;
 	/* find permutation parity (ignore the empty cell) */
-	for(j=k=0;j<info.y;j++) for(i=0;i<info.x;i++) if(cur.map[i][j]) perm[k++]=cur.map[i][j]-1;
+	for(j=k=0;j<info.y;j++) for(i=0;i<info.x;i++) if(cur[thr].map[i][j]) perm[k++]=cur[thr].map[i][j]-1;
 	for(i=0;i<info.xy-1;i++) if(perm[i]>-1 && perm[i]!=i) {
 		for(k=i,len=-1,j=perm[k],perm[k]=-1,k=j;j>-1;j=perm[k],perm[k]=-1,k=j,len++);
 		parity+=len;
@@ -113,11 +114,11 @@ void domain_init() {
 						val=0;
 						while(isdigit(s[k])) val=val*10+s[k]-'0';
 						if(s[k++]!='}') error("expected } in map");
-						cur.map[i][j]=val;
-					} else if(isdigit(c)) cur.map[i][j]=c-'0';
-					else if(isupper(c)) cur.map[i][j]=c-'A'+10;
-					else if(islower(c)) cur.map[i][j]=c-'a'+36;
-					else if(c==' ') cur.map[i][j]=0;
+						cur[0].map[i][j]=val;
+					} else if(isdigit(c)) cur[0].map[i][j]=c-'0';
+					else if(isupper(c)) cur[0].map[i][j]=c-'A'+10;
+					else if(islower(c)) cur[0].map[i][j]=c-'a'+36;
+					else if(c==' ') cur[0].map[i][j]=0;
 					else error("illegal char");
 				}
 			}
@@ -127,7 +128,7 @@ void domain_init() {
 	info.xy=info.x*info.y;
 	/* sanity: check that numbers from 0 to xy-1 occurs */
 	for(k=0;k<info.xy;k++) {
-		for(i=0;i<info.x;i++) for(j=0;j<info.y;j++) if(cur.map[i][j]==k) goto ok;
+		for(i=0;i<info.x;i++) for(j=0;j<info.y;j++) if(cur[0].map[i][j]==k) goto ok;
 		error("input must contains numbers from 1 to x*y-1");
 	ok:;
 	}
@@ -140,9 +141,9 @@ void domain_init() {
 	   search as far as we can" */
 	for(info.slen=0,z=info.dsize;z;info.slen++,z>>=8);
 	info.goal=0;
-	for(i=0;i<info.x;i++) for(j=0;j<info.y;j++) if(cur.map[i][j]!=(i+j*info.x+1)%info.xy) info.goal=1;
+	for(i=0;i<info.x;i++) for(j=0;j<info.y;j++) if(cur[0].map[i][j]!=(i+j*info.x+1)%info.xy) info.goal=1;
 	/* check if start state is solvable */
-	if(!issolvable()) error("unsolvable input state");
+	if(!issolvable(0)) error("unsolvable input state");
 	/* precalculate tables for rank/unrank */
 	factorial[0]=1;
 	for(i=1;i<64;i++) factorial[i]=factorial[i-1]*i;
@@ -153,17 +154,17 @@ void domain_init() {
 }
 
 unsigned char *domain_size() {
-	return getptr(info.dsize-1);
+	return getptr(info.dsize-1,0);
 }
 
 int state_size() {
 	return info.slen;
 }
 
-void print_state() {
+void print_state(int thr) {
 	int i,j;
 	for(j=0;j<info.y;j++) {
-		for(i=0;i<info.x;i++) printf("%3d",cur.map[i][j]);
+		for(i=0;i<info.x;i++) printf("%3d",cur[thr].map[i][j]);
 		putchar('\n');
 	}
 	putchar('\n');
@@ -177,7 +178,7 @@ static void printhex(int x) {
 	hexchar(x/16); hexchar(x&15);
 }
 
-unsigned char *encode_state() {
+unsigned char *encode_state(int thr) {
 	statetype v=0;
 	int i,j,k,a,l;
 	if(0 && info.xy<=CROSSOVER) {
@@ -185,24 +186,24 @@ unsigned char *encode_state() {
 		int taken=0;
 		for(k=j=0;j<info.y;j++) for(i=0;i<info.x;i++,k++) {
 			/* at step k: add k-th element (minus lower, earlier elements) * (x*y-k-1)! */
-			a=cur.map[i][j]-dp[taken&((1<<cur.map[i][j])-1)];
+			a=cur[thr].map[i][j]-dp[taken&((1<<cur[thr].map[i][j])-1)];
 			v+=a*factorial[info.xy-k-1];
-			taken|=1<<cur.map[i][j];
+			taken|=1<<cur[thr].map[i][j];
 		}
 	} else {
 		/* O(n^2) time */
 		long long taken=0;
 		for(k=j=0;j<info.y;j++) for(i=0;i<info.x;i++,k++) {
 			/* at step k: add k-th element (minus lower, earlier elements) * (x*y-k-1)! */
-			for(a=l=0;l<cur.map[i][j];l++) if(!(taken&(1LL<<l))) a++;
+			for(a=l=0;l<cur[thr].map[i][j];l++) if(!(taken&(1LL<<l))) a++;
 			v+=a*factorial[info.xy-k-1];
-			taken|=1<<cur.map[i][j];
+			taken|=1<<cur[thr].map[i][j];
 		}
 	}
-	return getptr(v);
+	return getptr(v,thr);
 }
 
-void decode_state(unsigned char *p) {
+void decode_state(unsigned char *p,int thr) {
 	statetype v=getval(p);
 	int i,j,k,a,l,m;
 	long long taken=0;
@@ -210,30 +211,30 @@ void decode_state(unsigned char *p) {
 		a=v/factorial[info.xy-k-1]; v%=factorial[info.xy-k-1];
 		/* find the a-th element not yet taken */
 		for(m=l=0;;m++) if(!(taken&(1LL<<m))) { l++; if(l>a) break; }
-		cur.map[i][j]=m;
+		cur[thr].map[i][j]=m;
 		taken|=1LL<<m;
 	}
 }
 
-int won() {
+int won(int thr) {
 	int i,j,k;
 	/* enumerate entire tree mode, never win */
 	if(!info.goal) return 0;
-	for(k=j=0;j<info.y;j++) for(i=0;i<info.x;i++,k++) if(cur.map[i][j]!=(k+1)%info.xy) return 0;
+	for(k=j=0;j<info.y;j++) for(i=0;i<info.x;i++,k++) if(cur[thr].map[i][j]!=(k+1)%info.xy) return 0;
 	return 1;
 }
 
-void visit_neighbours() {
+void visit_neighbours(int thr) {
 	int i,j,cx=0,cy=0,d,x2,y2,v;
 	/* find blank */
-	for(i=0;i<info.x;i++) for(j=0;j<info.y;j++) if(!cur.map[i][j]) cx=i,cy=j;
+	for(i=0;i<info.x;i++) for(j=0;j<info.y;j++) if(!cur[thr].map[i][j]) cx=i,cy=j;
 	for(d=0;d<4;d++) {
 		x2=cx+dx[d]; y2=cy+dy[d];
 		if(x2<0 || y2<0 || x2>=info.x || y2>=info.y) continue;
-		v=cur.map[x2][y2];
-		cur.map[cx][cy]=v; cur.map[x2][y2]=0;
-		add_child(encode_state());
-		cur.map[x2][y2]=v;
+		v=cur[thr].map[x2][y2];
+		cur[thr].map[cx][cy]=v; cur[thr].map[x2][y2]=0;
+		add_child(encode_state(thr),thr);
+		cur[thr].map[x2][y2]=v;
 	}
-	cur.map[cx][cy]=0;
+	cur[thr].map[cx][cy]=0;
 }

@@ -55,7 +55,7 @@ static void solver_init() {
 	if(bfs.n==0 || bfs.n>=(1ULL<<60)-1) error("state space too large");
 	if(!(bfs.prev=malloc(bfs.n*sizeof(unsigned long long)))) error("out of memory allocating prev");
 	if(!(bfs.q=malloc(bfs.n*sizeof(unsigned long long)))) error("out of memory allocating q");
-	printf("states "LONG"\n",bfs.n);
+	printf("states %lld\n",bfs.n);
 	for(i=0;i<bfs.n;i++) bfs.prev[i]=UNVISITED;
 }
 
@@ -70,17 +70,17 @@ static void showsolution(unsigned long long state) {
 	while(v!=ROOT) sol[--i]=v,v=bfs.prev[v];
 	for(i=0;i<len;i++) {
 		printf("move %d\n",i);
-		decode_state(getptr(sol[i]));
-		print_state();
+		decode_state(getptr(sol[i]),0);
+		print_state(0);
 	}
 	exit(0);
 }
 
-void add_child(unsigned char *p) {
+void add_child(unsigned char *p,int thr) {
 	unsigned long long next=getval(p);
 	if(bfs.prev[next]==UNVISITED) {
 		bfs.prev[next]=bfs.cur;
-		if(won()) showsolution(next);
+		if(won(thr)) showsolution(next);
 		bfs.q[bfs.qe++]=next;
 		if(bfs.qe==bfs.n) bfs.qe=0;
 		if(bfs.qs==bfs.qe) error("bfs queue exhausted");
@@ -89,13 +89,13 @@ void add_child(unsigned char *p) {
 
 static void solver_bfs() {
 	bfs.qs=bfs.qe=0;
-	bfs.q[bfs.qe++]=getval(encode_state());
+	bfs.q[bfs.qe++]=getval(encode_state(0));
 	bfs.prev[bfs.q[0]]=ROOT;
 	while(bfs.qs<bfs.qe) {
-		decode_state(getptr(bfs.cur=bfs.q[bfs.qs]));
+		decode_state(getptr(bfs.cur=bfs.q[bfs.qs]),0);
 		bfs.qs++; if(bfs.qs==bfs.n) bfs.qs=0;
-		if(bfs.qs%100000==0) printf("processed "ULONG" states, "ULONG" in queue\n",bfs.qs,bfs.qe-bfs.qs);
-		visit_neighbours();
+		if(bfs.qs%100000==0) printf("processed %llu states, %llu in queue\n",bfs.qs,bfs.qe-bfs.qs);
+		visit_neighbours(0);
 	}
 }
 

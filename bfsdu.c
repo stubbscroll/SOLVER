@@ -126,7 +126,7 @@ static void printrawstate(unsigned char *p) {
 	printf("\n");
 }
 
-void add_child(unsigned char *p) {
+void add_child(unsigned char *p,int thr) {
 	if(bfs.cure==bfs.blen) {
 		/* current generation too large, repack */
 		/* memory layout at this point:
@@ -160,10 +160,10 @@ void add_child(unsigned char *p) {
 			error("out of memory");
 		}
 	}
-//	printf("  FOUND NEW STATE %I64d: ",bfs.cure);
+//	printf("  FOUND NEW STATE %lld: ",bfs.cure);
 //	printrawstate(p);
 //	print_state();
-	if(won()) {
+	if(won(thr)) {
 		printf("we won in %d moves\n",bfs.iter+1);
 		error("output of solution not currently supported");
 	}
@@ -174,26 +174,26 @@ void add_child(unsigned char *p) {
 
 static void printqueue() {
 	long long i;
-	for(i=0;i<bfs.prevpreve;i+=bfs.slen) printf("prevprev %6I64d: ",i),printrawstate(bfs.b+i);
-	for(;i<bfs.preve;i+=bfs.slen) printf("prev     %6I64d: ",i),printrawstate(bfs.b+i);
-	for(;i<bfs.cure;i+=bfs.slen) printf("cur      %6I64d: ",i),printrawstate(bfs.b+i);
+	for(i=0;i<bfs.prevpreve;i+=bfs.slen) printf("prevprev %6lld: ",i),printrawstate(bfs.b+i);
+	for(;i<bfs.preve;i+=bfs.slen) printf("prev     %6lld: ",i),printrawstate(bfs.b+i);
+	for(;i<bfs.cure;i+=bfs.slen) printf("cur      %6lld: ",i),printrawstate(bfs.b+i);
 }
 
 static void solver_bfs() {
 	long long at;
 	/* insert initial position into previous iteration */
-	copypos(bfs.b,encode_state());
+	copypos(bfs.b,encode_state(0));
 	bfs.curcs=bfs.preve=bfs.curs=bfs.cure=bfs.slen;
 	bfs.prevn=1;
 	while(bfs.prevn) {
 		if(bfs.repack) printf("[%d] ",bfs.repack),bfs.repack=0;
-		printf("%d: q "LONG" tot "LONG"\n",bfs.iter,bfs.prevn,bfs.tot);
+		printf("%d: q %lld tot %lld\n",bfs.iter,bfs.prevn,bfs.tot);
 		for(bfs.curnn=bfs.curin=0,at=bfs.prevs;at<bfs.preve;at+=bfs.slen) {
-			decode_state(bfs.b+at);
-//			printf("POP FROM %I64d: ",at);
+			decode_state(bfs.b+at,0);
+//			printf("POP FROM %lld: ",at);
 //			printrawstate(bfs.b+at);
 //			print_state();
-			visit_neighbours();
+			visit_neighbours(0);
 		}
 		/* sort current iteration and remove duplicates within the iteration */
 		/* up to this point, only cure, curin and curnn are set (not curn) */

@@ -57,7 +57,7 @@ static struct static_s {
 
 static struct state_s {
 	char map[MAX][MAX];  /* '$':block, '@':man, ' ':nothing */
-} cur;
+} cur[MAXTHR];
 
 static void error(char *s) { puts(s); exit(1); }
 
@@ -69,12 +69,13 @@ static unsigned long long getval(unsigned char *p) {
 	return n;
 }
 
-/* convert unsigned long long to pointer-thing */
-static unsigned char *getptr(unsigned long long v) {
-	static unsigned char p[8];
+static unsigned char p[MAXTHR][16];
+
+/* convert statetype to pointer-thing */
+static unsigned char *getptr(unsigned long long v,int thr) {
 	int i;
-	for(i=0;i<info.slen;i++) p[i]=v&255,v>>=8;
-	return p;
+	for(i=0;i<info.slen;i++) p[thr][i]=v&255,v>>=8;
+	return p[thr];
 }
 
 /* read input and populate info and cur */
@@ -85,7 +86,7 @@ void domain_init() {
 	info.x=info.y=0;
 	info.goalx=info.goaly=-1;
 	memset(info.smap,0,sizeof(info.smap));
-	memset(cur.map,0,sizeof(cur.map));
+	memset(cur[0].map,0,sizeof(cur[0].map));
 	while(fgets(s,998,stdin)) {
 		if(s[0]=='#') continue; /* non-map line starting with #: comment */
 		sscanf(s,"%98s",t);
@@ -100,16 +101,16 @@ void domain_init() {
 				if(!fgets(s,998,stdin)) error("map ended unexpectedly");
 				for(i=0;i<info.x;i++) {
 					c=s[i];
-					if(c=='#') info.smap[i][j]='#',cur.map[i][j]='#';
-					else if(c==' ') info.smap[i][j]=' ',cur.map[i][j]=' ';
-					else if(c=='.') info.smap[i][j]='.',cur.map[i][j]=' ';
-					else if(c=='$') info.smap[i][j]=' ',cur.map[i][j]='$';
-					else if(c=='_') info.smap[i][j]='_',cur.map[i][j]=' ';
-					else if(c=='*') info.smap[i][j]='.',cur.map[i][j]='$';
-					else if(c=='@') info.smap[i][j]=' ',cur.map[i][j]='@';
-					else if(c=='+') info.smap[i][j]='.',cur.map[i][j]='@';
-					else if(c=='=') info.smap[i][j]='_',cur.map[i][j]='@';
-					else if(c=='g') info.smap[i][j]=' ',cur.map[i][j]=' ',info.goalx=i,info.goaly=j;
+					if(c=='#') info.smap[i][j]='#',cur[0].map[i][j]='#';
+					else if(c==' ') info.smap[i][j]=' ',cur[0].map[i][j]=' ';
+					else if(c=='.') info.smap[i][j]='.',cur[0].map[i][j]=' ';
+					else if(c=='$') info.smap[i][j]=' ',cur[0].map[i][j]='$';
+					else if(c=='_') info.smap[i][j]='_',cur[0].map[i][j]=' ';
+					else if(c=='*') info.smap[i][j]='.',cur[0].map[i][j]='$';
+					else if(c=='@') info.smap[i][j]=' ',cur[0].map[i][j]='@';
+					else if(c=='+') info.smap[i][j]='.',cur[0].map[i][j]='@';
+					else if(c=='=') info.smap[i][j]='_',cur[0].map[i][j]='@';
+					else if(c=='g') info.smap[i][j]=' ',cur[0].map[i][j]=' ',info.goalx=i,info.goaly=j;
 					else error("illegal char");
 				}
 			}
@@ -127,8 +128,8 @@ void domain_init() {
 			info.idmap[i][j]=info.floor++;
 		}
 		if(info.smap[i][j]=='.') goals++;
-		if(cur.map[i][j]=='@') men++;
-		if(cur.map[i][j]=='$') info.blocks++;
+		if(cur[0].map[i][j]=='@') men++;
+		if(cur[0].map[i][j]=='$') info.blocks++;
 	}
 	if(men!=1) error("map must contain 1 man");
 	if(goals!=info.blocks) error("map must contain same number of blocks and destinations");
@@ -138,85 +139,85 @@ void domain_init() {
 	for(i=0;i<=info.blocks;i++) dsize*=info.floor,info.dsize*=info.floor;
 	if(dsize>9223372036854775807LL) error("state space too large");
 	for(i=8;i;i--) if(((info.dsize>>((i-1)*8))&255)) { info.slen=i; break; }
-	printf("loaded sokoban puzzle, state space "ULONG"\n",info.dsize);
+	printf("loaded sokoban puzzle, state space %llu\n",info.dsize);
 }
 
 unsigned char *domain_size() {
-	return getptr(info.dsize-1);
+	return getptr(info.dsize-1,0);
 }
 
 int state_size() {
 	return info.slen;
 }
 
-void print_state() {
+void print_state(int thr) {
 	int i,j;
 	for(j=0;j<info.y;j++) {
 		for(i=0;i<info.x;i++) {
-			if(cur.map[i][j]==' ' && info.smap[i][j]=='_') putchar('_');
-			else if(cur.map[i][j]==' ' && info.smap[i][j]=='.') putchar('.');
-			else putchar(cur.map[i][j]);
+			if(cur[thr].map[i][j]==' ' && info.smap[i][j]=='_') putchar('_');
+			else if(cur[thr].map[i][j]==' ' && info.smap[i][j]=='.') putchar('.');
+			else putchar(cur[thr].map[i][j]);
 		}
 		putchar('\n');
 	}
 	putchar('\n');
 }
 
-unsigned char *encode_state() {
+unsigned char *encode_state(int thr) {
 	unsigned long long v=0;
 	int i,j;
-	for(i=0;i<info.x;i++) for(j=0;j<info.y;j++) if(cur.map[i][j]=='$') v=v*info.floor+info.idmap[i][j];
-	for(i=0;i<info.x;i++) for(j=0;j<info.y;j++) if(cur.map[i][j]=='@') v=v*info.floor+info.idmap[i][j];
-	return getptr(v);
+	for(i=0;i<info.x;i++) for(j=0;j<info.y;j++) if(cur[thr].map[i][j]=='$') v=v*info.floor+info.idmap[i][j];
+	for(i=0;i<info.x;i++) for(j=0;j<info.y;j++) if(cur[thr].map[i][j]=='@') v=v*info.floor+info.idmap[i][j];
+	return getptr(v,thr);
 }
 
-void decode_state(unsigned char *p) {
+void decode_state(unsigned char *p,int thr) {
 	unsigned long long v=getval(p);
 	int i,w;
 	/* clear map */
-	for(i=0;i<info.floor;i++) cur.map[info.idx[i]][info.idy[i]]=' ';
+	for(i=0;i<info.floor;i++) cur[thr].map[info.idx[i]][info.idy[i]]=' ';
 	/* extract man */
 	w=v%info.floor; v/=info.floor;
-	cur.map[info.idx[w]][info.idy[w]]='@';
+	cur[thr].map[info.idx[w]][info.idy[w]]='@';
 	/* extract blocks */
 	for(i=0;i<info.blocks;i++) {
 		w=v%info.floor; v/=info.floor;
-		cur.map[info.idx[w]][info.idy[w]]='$';
+		cur[thr].map[info.idx[w]][info.idy[w]]='$';
 	}
 }
 
-int won() {
+int won(int thr) {
 	int i,j;
-	for(i=0;i<info.x;i++) for(j=0;j<info.y;j++) if(info.smap[i][j]=='.' && cur.map[i][j]!='$') return 0;
-	if(info.goalx>-1 && info.goaly>-1 && cur.map[info.goalx][info.goaly]!='@') return 0;
+	for(i=0;i<info.x;i++) for(j=0;j<info.y;j++) if(info.smap[i][j]=='.' && cur[thr].map[i][j]!='$') return 0;
+	if(info.goalx>-1 && info.goaly>-1 && cur[thr].map[info.goalx][info.goaly]!='@') return 0;
 	return 1;
 }
 
-void visit_neighbours() {
+void visit_neighbours(int thr) {
 	int cx=0,cy=0,i,j,d,x2,y2,x3,y3;
 	/* find man */
-	for(i=0;i<info.x;i++) for(j=0;j<info.y;j++) if(cur.map[i][j]=='@') cx=i,cy=j;
+	for(i=0;i<info.x;i++) for(j=0;j<info.y;j++) if(cur[thr].map[i][j]=='@') cx=i,cy=j;
 	for(d=0;d<4;d++) {
 		x2=cx+dx[d]; y2=cy+dy[d];
 		if(x2<0 || y2<0 || x2>=info.x || y2>=info.y || info.smap[x2][y2]=='#') continue;
-		if(cur.map[x2][y2]==' ') {
+		if(cur[thr].map[x2][y2]==' ') {
 			/* move man */
-			cur.map[cx][cy]=' ';
-			cur.map[x2][y2]='@';
-			add_child(encode_state());
-			cur.map[cx][cy]='@';
-			cur.map[x2][y2]=' ';
-		} else if(cur.map[x2][y2]=='$') {
+			cur[thr].map[cx][cy]=' ';
+			cur[thr].map[x2][y2]='@';
+			add_child(encode_state(thr),thr);
+			cur[thr].map[cx][cy]='@';
+			cur[thr].map[x2][y2]=' ';
+		} else if(cur[thr].map[x2][y2]=='$') {
 			x3=x2+dx[d]; y3=y2+dy[d];
-			if(x3<0 || y3<0 || x3>=info.x || y3>=info.y || info.smap[x3][y3]=='#' || cur.map[x3][y3]!=' ' || info.smap[x3][y3]=='_') continue;
+			if(x3<0 || y3<0 || x3>=info.x || y3>=info.y || info.smap[x3][y3]=='#' || cur[thr].map[x3][y3]!=' ' || info.smap[x3][y3]=='_') continue;
 			/* push block */
-			cur.map[cx][cy]=' ';
-			cur.map[x2][y2]='@';
-			cur.map[x3][y3]='$';
-			add_child(encode_state());
-			cur.map[cx][cy]='@';
-			cur.map[x2][y2]='$';
-			cur.map[x3][y3]=' ';
+			cur[thr].map[cx][cy]=' ';
+			cur[thr].map[x2][y2]='@';
+			cur[thr].map[x3][y3]='$';
+			add_child(encode_state(thr),thr);
+			cur[thr].map[cx][cy]='@';
+			cur[thr].map[x2][y2]='$';
+			cur[thr].map[x3][y3]=' ';
 		}
 	}
 }

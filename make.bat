@@ -1,17 +1,31 @@
 @rem make all eligible combinations
-gcc -o chip1-bfs.exe bfs.c chip1.c -O3 -Wall -std=c99
-gcc -o chip1-bfs2.exe bfs2.c chip1.c -O3 -Wall -std=c99
-gcc -o chip1-bfsd.exe bfsd.c chip1.c -O3 -Wall -std=c99
-gcc -o soko-bfs.exe bfs.c soko.c -O3 -Wall -std=c99
-gcc -o soko-bfs2.exe bfs2.c soko.c -O3 -Wall -std=c99
-gcc -o soko-bfsd.exe bfsd.c soko.c -O3 -Wall -std=c99
-gcc -o soko2-bfs.exe bfs.c soko2.c -O3 -Wall -std=c99
-gcc -o soko2-bfs2.exe bfs2.c soko2.c -O3 -Wall -std=c99
-gcc -o soko2-bfsd.exe bfsd.c soko2.c -O3 -Wall -std=c99
-gcc -o soko3-bfs.exe bfs.c soko3.c -O3 -Wall -std=c99
-gcc -o soko3-bfs2.exe bfs2.c soko3.c -O3 -Wall -std=c99
-gcc -o soko3-bfsd.exe bfsd.c soko3.c -O3 -Wall -std=c99
-gcc -o npuzzle-bfs.exe bfs.c npuzzle.c -O3 -Wall -std=c99
-gcc -o npuzzle-bfs2.exe bfs2.c npuzzle.c -O3 -Wall -std=c99
-gcc -o npuzzle-bfsd.exe bfsd.c npuzzle.c -O3 -Wall -std=c99
-gcc -o npuzzle-bfsdu.exe bfsdu.c npuzzle.c -O3 -Wall -std=c99
+gcc -o chip1-bfs.exe bfs.c chip1.c -O3 -Wall
+gcc -o chip1-bfs2.exe bfs2.c chip1.c -O3 -Wall
+gcc -o chip1-bfs2p.exe bfs2p.c chip1.c -O3 -Wall
+gcc -o chip1-bfsd.exe bfsd.c chip1.c -O3 -Wall
+gcc -o soko-bfs.exe bfs.c soko.c -O3 -Wall
+gcc -o soko-bfs2.exe bfs2.c soko.c -O3 -Wall
+gcc -o soko-bfs2p.exe bfs2p.c soko.c -O3 -Wall
+gcc -o soko-bfsd.exe bfsd.c soko.c -O3 -Wall
+gcc -o soko2-bfs.exe bfs.c soko2.c -O3 -Wall
+gcc -o soko2-bfs2.exe bfs2.c soko2.c -O3 -Wall
+gcc -o soko2-bfs2p.exe bfs2p.c soko2.c -O3 -Wall
+gcc -o soko2-bfsd.exe bfsd.c soko2.c -O3 -Wall
+gcc -o soko3-bfs.exe bfs.c soko3.c -O3 -Wall
+gcc -o soko3-bfs2.exe bfs2.c soko3.c -O3 -Wall
+gcc -o soko3-bfs2p.exe bfs2p.c soko3.c -O3 -Wall
+gcc -o soko3-bfsd.exe bfsd.c soko3.c -O3 -Wall
+gcc -o soko4-bfs.exe bfs.c soko4.c -O3 -Wall
+gcc -o soko4-bfs2.exe bfs2.c soko4.c -O3 -Wall
+gcc -o soko4-bfs2p.exe bfs2p.c soko4.c -O3 -Wall
+gcc -o soko4-bfsd.exe bfsd.c soko4.c -O3 -Wall
+gcc -o npuzzle-bfs.exe bfs.c npuzzle.c -O3 -Wall
+gcc -o npuzzle-bfs2.exe bfs2.c npuzzle.c -O3 -Wall
+gcc -o npuzzle-bfs2p.exe bfs2p.c npuzzle.c -O3 -Wall
+gcc -o npuzzle-bfsd.exe bfsd.c npuzzle.c -O3 -Wall
+gcc -o npuzzle-bfsdu.exe bfsdu.c npuzzle.c -O3 -Wall
+gcc -o plank-bfs.exe bfs.c plank.c -O3 -Wall
+gcc -o plank-bfs2.exe bfs2.c plank.c -O3 -Wall
+gcc -o plank-bfs2p.exe bfs2p.c plank.c -O3 -Wall
+gcc -o plank-bfsd.exe bfsd.c plank.c -O3 -Wall
+gcc -o plank-bfsdu.exe bfsdu.c plank.c -O3 -Wall

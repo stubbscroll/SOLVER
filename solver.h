@@ -5,16 +5,7 @@
 #ifndef _SOLVER_H
 #define _SOLVER_H
 
-#ifdef __MINGW64__
-	#define LONG "%I64d"
-	#define ULONG "%I64u"
-#elif defined (_MSC_VER)
-	#define LONG "%I64d"
-	#define ULONG "%I64u"
-#else
-	#define LONG "%lld"
-	#define ULONG "%llu"
-#endif
+#define MAXTHR 1000 // max number of threads
 
 /* contract
    - never assume that the pointers to encoded states are valid after new calls
@@ -38,21 +29,21 @@ unsigned char *domain_size(void);
 int state_size(void);
 
 /* return encoded version of current state */
-unsigned char *encode_state(void);
+unsigned char *encode_state(int);
 
 /* decode given state and set as current state */
-void decode_state(unsigned char *);
+void decode_state(unsigned char *,int);
 
 /* print current state */
-void print_state(void);
+void print_state(int);
 
 /* visit all neighbouring states from current state */
 /* it must call add_child(ptr) for each generated neighbour where ptr is the
    encoded state */
-void visit_neighbours(void);
+void visit_neighbours(int);
 
 /* return 1 if current state is a win state, 0 otherwise */
-int won(void);
+int won(int);
 
 /* TODO
    - a* heuristic (calculate distance to goal (no overestimate))
@@ -60,6 +51,6 @@ int won(void);
 
 /* solver functions **********************************************************/
 
-void add_child(unsigned char *);
+void add_child(unsigned char *,int);
 
 #endif

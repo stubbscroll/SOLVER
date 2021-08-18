@@ -101,7 +101,7 @@ static struct options_s {
 static struct state_s {
 	char map[MAX][MAX];
 	int playerdir;       /* 0-3 dir (from dx[], dy[]), 4=not moved yet */
-} cur;
+} cur[MAXTHR];
 
 static void error(char *s) { puts(s); exit(1); }
 
@@ -113,12 +113,15 @@ static statetype getval(unsigned char *p) {
 	return n;
 }
 
+static unsigned char p[MAXTHR][16];
+
 /* convert statetype to pointer-thing */
-static unsigned char *getptr(statetype v) {
-	static unsigned char p[16];
+// each thread need its own pointer-thing because the info needs to live until
+// the next call of this function
+static unsigned char *getptr(statetype v,int thr) {
 	int i;
-	for(i=0;i<info.slen;i++) p[i]=v&255,v>>=8;
-	return p;
+	for(i=0;i<info.slen;i++) p[thr][i]=v&255,v>>=8;
+	return p[thr];
 }
 
 /* ----- state representation: permutation rank ---------------------------- */
@@ -135,42 +138,42 @@ static unsigned char *getptr(statetype v) {
 
 #define MAXPASCAL 1025
 static statetype pas[MAXPASCAL][MAXPASCAL];
-static int counts[2];                      /* only floor and block */
-static int multiset[MAX*MAX];              /* current board string (permutation) */
-static int plen;                           /* number of elements in permutation */
+static int counts[MAXTHR][2];                      /* only floor and block */
+static int multiset[MAXTHR][MAX*MAX];              /* current board string (permutation) */
+static int plen[MAXTHR];                           /* number of elements in permutation */
 
 /* fast version (inline), result in res. will destroy upper,lower,i */
 #define EVAL_MULT(res,upper,lower,i,coeff,evallen) { res=1; upper=coeff[0]; lower=0; for(i=1;i<evallen;i++) upper+=coeff[i],lower+=coeff[i-1],res*=pas[upper][lower]; }
 
 /* calculate permutation rank of sequence in multiset[] */
-static statetype permrank() {
+static statetype permrank(int thr) {
 	statetype res=0,r2;
 	int i,j,k,upper,lower,left[2];
-	for(i=0;i<2;i++) left[i]=counts[i];
-	for(i=0;i<plen;i++) {
-		for(j=0;j<multiset[i];j++) if(left[j]) {
+	for(i=0;i<2;i++) left[i]=counts[thr][i];
+	for(i=0;i<plen[thr];i++) {
+		for(j=0;j<multiset[thr][i];j++) if(left[j]) {
 			left[j]--;
 			EVAL_MULT(r2,upper,lower,k,left,2);
 			res+=r2;
 			left[j]++;
 		}
-		left[multiset[i]]--;
+		left[multiset[thr][i]]--;
 	}
 	return res;
 }
 
 /* given permutation rank, return sequence in multiset[] */
-static void permunrank(statetype rank) {
+static void permunrank(statetype rank,int thr) {
 	statetype run,next,r2;
 	int i,j,upper,lower,k,left[2];
-	for(i=0;i<2;i++) left[i]=counts[i];
-	for(i=0;i<plen;i++) {
+	for(i=0;i<2;i++) left[i]=counts[thr][i];
+	for(i=0;i<plen[thr];i++) {
 		for(run=j=0;j<2;j++) if(left[j]) {
 			left[j]--;
 			EVAL_MULT(r2,upper,lower,k,left,2);
 			next=run+r2;
 			if(next>rank) {
-				multiset[i]=j,rank-=run;
+				multiset[thr][i]=j,rank-=run;
 				break;
 			}
 			left[j]++;
@@ -273,9 +276,9 @@ void domain_init() {
 	info.hascorridor=0;
 	options.skipndeadlock=0;
 	options.skipgoaldeadlock=0;
-	cur.playerdir=4;
+	cur[0].playerdir=4;
 	memset(info.smap,0,sizeof(info.smap));
-	memset(cur.map,0,sizeof(cur.map));
+	memset(cur[0].map,0,sizeof(cur[0].map));
 	while(fgets(s,998,stdin)) {
 		if(s[0]=='#') continue; /* non-map line starting with #: comment */
 		if(s[0]==13 || s[0]==10) continue; /* blank line */
@@ -295,16 +298,16 @@ void domain_init() {
 				if(!fgets(s,998,stdin)) error("map ended unexpectedly");
 				for(i=0;i<info.x;i++) {
 					c=s[i];
-					if(c=='#') info.smap[i][j]='#',cur.map[i][j]='#';
-					else if(c==' ') info.smap[i][j]='d',cur.map[i][j]=' ';
-					else if(c=='.') info.smap[i][j]='.',cur.map[i][j]=' ';
-					else if(c=='$') info.smap[i][j]='d',cur.map[i][j]='$';
-					else if(c=='_') info.smap[i][j]='_',cur.map[i][j]=' ';
-					else if(c=='*') info.smap[i][j]='.',cur.map[i][j]='$';
-					else if(c=='@') info.smap[i][j]='d',cur.map[i][j]='@';
-					else if(c=='+') info.smap[i][j]='.',cur.map[i][j]='@';
-					else if(c=='=') info.smap[i][j]='_',cur.map[i][j]='@';
-					else if(c=='g') info.smap[i][j]='d',cur.map[i][j]=' ',info.goalx=i,info.goaly=j;
+					if(c=='#') info.smap[i][j]='#',cur[0].map[i][j]='#';
+					else if(c==' ') info.smap[i][j]='d',cur[0].map[i][j]=' ';
+					else if(c=='.') info.smap[i][j]='.',cur[0].map[i][j]=' ';
+					else if(c=='$') info.smap[i][j]='d',cur[0].map[i][j]='$';
+					else if(c=='_') info.smap[i][j]='_',cur[0].map[i][j]=' ';
+					else if(c=='*') info.smap[i][j]='.',cur[0].map[i][j]='$';
+					else if(c=='@') info.smap[i][j]='d',cur[0].map[i][j]='@';
+					else if(c=='+') info.smap[i][j]='.',cur[0].map[i][j]='@';
+					else if(c=='=') info.smap[i][j]='_',cur[0].map[i][j]='@';
+					else if(c=='g') info.smap[i][j]='d',cur[0].map[i][j]=' ',info.goalx=i,info.goaly=j;
 					else printf("illegal char %d\n",c),exit(1);
 				}
 			}
@@ -332,13 +335,14 @@ void domain_init() {
 			info.idmap[i][j]=info.floor++;
 		}
 		if(info.smap[i][j]=='.') goals++;
-		if(cur.map[i][j]=='@') men++;
-		if(cur.map[i][j]=='$') info.blocks++;
+		if(cur[0].map[i][j]=='@') men++;
+		if(cur[0].map[i][j]=='$') info.blocks++;
 	}
+	printf("%d live floor, %d floor, %d blocks, %d goals\n",info.lfloor,info.floor,info.blocks,goals);
 	if(men!=1) error("map must contain 1 man");
 	if(goals!=info.blocks) error("map must contain same number of blocks and destinations");
 	if(!goals) error("map must contain at least 1 block");
-	for(i=0;i<info.x;i++) for(j=0;j<info.y;j++) if(cur.map[i][j]=='$' && info.id2map[i][j]<0)
+	for(i=0;i<info.x;i++) for(j=0;j<info.y;j++) if(cur[0].map[i][j]=='$' && info.id2map[i][j]<0)
 		error("illegal start config, block starts on dead space");
 	/* find goal corridor */
 	if(!options.skipgoaldeadlock) findgoalcorridor();
@@ -350,10 +354,12 @@ void domain_init() {
 	if(fabs(dsize-info.dsize)/dsize>0.001) error("state space too large");
 	for(info.slen=0,z=info.dsize;z;info.slen++,z>>=8);
 	printf("loaded sokoban puzzle, state space %.0f, state %d bytes\n",dsize,info.slen);
+	// copy the cur[] array to all threads
+	for(int i=1;i<MAXTHR;i++) cur[i]=cur[0];
 }
 
 unsigned char *domain_size() {
-	return getptr(info.dsize-1);
+	return getptr(info.dsize-1,0);
 }
 
 int state_size() {
@@ -364,133 +370,133 @@ int state_size() {
    overwrote them with d. care about it later. we don't want to print out all
    the automatically detected 'd's, so we need to store the '_'s somewhere
    else */
-void print_state() {
+void print_state(int thr) {
 	int i,j;
 	for(j=0;j<info.y;j++) {
 		for(i=0;i<info.x;i++) {
-			if(cur.map[i][j]==' ' && info.smap[i][j]=='_') putchar('_');
-			else if(cur.map[i][j]==' ' && info.smap[i][j]=='.') putchar('.');
-			else putchar(cur.map[i][j]);
+			if(cur[thr].map[i][j]==' ' && info.smap[i][j]=='_') putchar('_');
+			else if(cur[thr].map[i][j]==' ' && info.smap[i][j]=='.') putchar('.');
+			else putchar(cur[thr].map[i][j]);
 		}
 		putchar('\n');
 	}
 	putchar('\n');
 }
 
-unsigned char *encode_state() {
+unsigned char *encode_state(int thr) {
 	statetype v=0;
 	int i,j,k;
 	/* find man: count number of floor (dead or live) before man */
 	for(v=i=j=0;j<info.y;j++) for(i=0;i<info.x;i++) {
-		if(cur.map[i][j]=='@') goto foundman;
-		else if(cur.map[i][j]=='$') continue;
+		if(cur[thr].map[i][j]=='@') goto foundman;
+		else if(cur[thr].map[i][j]=='$') continue;
 		else if(info.smap[i][j]=='#') continue;
 		v++;
 	}
 foundman:
 	/* set playerdir to 4 (no direction) if there are no slappable blocks nearby */
-	if(cur.playerdir<4) {
-		int x2=i+dx[cur.playerdir],y2=j+dy[cur.playerdir];
+	if(cur[thr].playerdir<4) {
+		int x2=i+dx[cur[thr].playerdir],y2=j+dy[cur[thr].playerdir];
 		/* can we continue in direction at all? check for wall */
 		if(x2<0 || y2<0 || x2>=info.x || y2>=info.y || info.smap[x2][y2]=='#') {
-//			printf("pruned dir %d (blocked by wall)\n",cur.playerdir);print_state();
-			cur.playerdir=4;
+//			printf("pruned dir %d (blocked by wall)\n",cur[thr].playerdir);print_state();
+			cur[thr].playerdir=4;
 			goto donedir;
 		}
 		/* we have block in front of us, check if it can be pushed */
-		if(cur.map[x2][y2]=='$') {
-			int x3=x2+dx[cur.playerdir],y3=y2+dy[cur.playerdir];
-			if(x3<0 || y3<0 || x3>=info.x || y3>=info.y || (info.smap[x3][y3]!=' ' && info.smap[x3][y3]!='.') || cur.map[x3][y3]=='$') {
-//				printf("pruned dir %d (blocked by block)\n",cur.playerdir);print_state();
-				cur.playerdir=4;
+		if(cur[thr].map[x2][y2]=='$') {
+			int x3=x2+dx[cur[thr].playerdir],y3=y2+dy[cur[thr].playerdir];
+			if(x3<0 || y3<0 || x3>=info.x || y3>=info.y || (info.smap[x3][y3]!=' ' && info.smap[x3][y3]!='.') || cur[thr].map[x3][y3]=='$') {
+//				printf("pruned dir %d (blocked by block)\n",cur[thr].playerdir);print_state();
+				cur[thr].playerdir=4;
 				goto donedir;
 			}
 		}
 		/* we can move, so check for slappable blocks on both sides */
-		int dd=(cur.playerdir+1)&3;
+		int dd=(cur[thr].playerdir+1)&3;
 		x2=i+dx[dd]; y2=j+dy[dd];
 		int x3=x2+dx[dd],y3=y2+dy[dd];
-		if(x3>=0 && y3>=0 && x3<info.x && y3<info.y && cur.map[x2][y2]=='$' && cur.map[x3][y3]==' ' && info.smap[x3][y3]!='d') goto donedir;
+		if(x3>=0 && y3>=0 && x3<info.x && y3<info.y && cur[thr].map[x2][y2]=='$' && cur[thr].map[x3][y3]==' ' && info.smap[x3][y3]!='d') goto donedir;
 		dd^=2;
 		x2=i+dx[dd]; y2=j+dy[dd];
 		x3=x2+dx[dd]; y3=y2+dy[dd];
-		if(x3>=0 && y3>=0 && x3<info.x && y3<info.y && cur.map[x2][y2]=='$' && cur.map[x3][y3]==' ' && info.smap[x3][y3]!='d') goto donedir;
-//		printf("pruned dir %d (no slappable blocks)\n",cur.playerdir);print_state();
-		cur.playerdir=4;
+		if(x3>=0 && y3>=0 && x3<info.x && y3<info.y && cur[thr].map[x2][y2]=='$' && cur[thr].map[x3][y3]==' ' && info.smap[x3][y3]!='d') goto donedir;
+//		printf("pruned dir %d (no slappable blocks)\n",cur[thr].playerdir);print_state();
+		cur[thr].playerdir=4;
 	}
 donedir:
 	/* generate permutation for live cells only (floor and blocks) */
-	counts[0]=counts[1]=plen=0;
+	counts[thr][0]=counts[thr][1]=plen[thr]=0;
 	for(k=0;k<info.lfloor;k++) {
 		i=info.id2x[k];
 		j=info.id2y[k];
-		if(cur.map[i][j]==' ' || cur.map[i][j]=='@') counts[0]++,multiset[plen++]=0;
-		else if(cur.map[i][j]=='$') counts[1]++,multiset[plen++]=1;
+		if(cur[thr].map[i][j]==' ' || cur[thr].map[i][j]=='@') counts[thr][0]++,multiset[thr][plen[thr]++]=0;
+		else if(cur[thr].map[i][j]=='$') counts[thr][1]++,multiset[thr][plen[thr]++]=1;
 	}
-	v+=permrank()*(info.floor-info.blocks);
-	v=v*5+cur.playerdir;
-	return getptr(v);
+	v+=permrank(thr)*(info.floor-info.blocks);
+	v=v*5+cur[thr].playerdir;
+	return getptr(v,thr);
 }
 
-void decode_state(unsigned char *p) {
+void decode_state(unsigned char *p,int thr) {
 	statetype v=getval(p);
 	int i,j,k,w,l;
 	/* clear map */
-	for(i=0;i<info.floor;i++) cur.map[info.idx[i]][info.idy[i]]=' ';
+	for(i=0;i<info.floor;i++) cur[thr].map[info.idx[i]][info.idy[i]]=' ';
 	/* extract player dir */
-	cur.playerdir=v%5; v/=5;
+	cur[thr].playerdir=v%5; v/=5;
 	/* extract man, but don't place him yet */
 	w=v%(info.floor-info.blocks); v/=(info.floor-info.blocks);
 	/* init unrank */
-	counts[0]=info.lfloor-info.blocks;
-	counts[1]=info.blocks;
-	plen=counts[0]+counts[1];
-	permunrank(v);
+	counts[thr][0]=info.lfloor-info.blocks;
+	counts[thr][1]=info.blocks;
+	plen[thr]=counts[thr][0]+counts[thr][1];
+	permunrank(v,thr);
 	for(k=l=0;k<info.lfloor;k++) {
 		i=info.id2x[k];
 		j=info.id2y[k];
-		cur.map[i][j]=multiset[l++]?'$':' ';
+		cur[thr].map[i][j]=multiset[thr][l++]?'$':' ';
 	}
 	for(j=0;j<info.y;j++) for(i=0;i<info.x;i++) {
-		if(info.smap[i][j]=='#' || cur.map[i][j]=='$') continue;
+		if(info.smap[i][j]=='#' || cur[thr].map[i][j]=='$') continue;
 		if(w--<1) {
-			cur.map[i][j]='@';
+			cur[thr].map[i][j]='@';
 			goto manplaced;
 		}
 	}
 manplaced:;
 }
 
-int won() {
+int won(int thr) {
 	int i,j;
-	for(i=0;i<info.x;i++) for(j=0;j<info.y;j++) if(info.smap[i][j]=='.' && cur.map[i][j]!='$') return 0;
-	if(info.goalx>-1 && info.goaly>-1 && cur.map[info.goalx][info.goaly]!='@') return 0;
+	for(i=0;i<info.x;i++) for(j=0;j<info.y;j++) if(info.smap[i][j]=='.' && cur[thr].map[i][j]!='$') return 0;
+	if(info.goalx>-1 && info.goaly>-1 && cur[thr].map[info.goalx][info.goaly]!='@') return 0;
 	return 1;
 }
 
 /* check for 2x2 deadlock with blocks+wall */
-static int bad2x2v2() {
+static int bad2x2v2(int thr) {
 	for(int i=0;i<info.x-1;i++) for(int j=0;j<info.y-1;j++) {
 		/* no blocks, no deadlock */
-		if(cur.map[i][j]!='$' && cur.map[i+1][j]!='$' && cur.map[i][j+1]!='$' && cur.map[i+1][j+1]!='$') continue;
+		if(cur[thr].map[i][j]!='$' && cur[thr].map[i+1][j]!='$' && cur[thr].map[i][j+1]!='$' && cur[thr].map[i+1][j+1]!='$') continue;
 		/* insta-reject trivial case with 4 walls */
 		if(info.smap[i][j]=='#' && info.smap[i+1][j]=='#' && info.smap[i][j+1]=='#' && info.smap[i+1][j+1]=='#') continue;
 		int badblock=0;
 		/* every cell in 2x2 must have block or wall and at least one block not on goal */
 		if(info.smap[i][j]=='#');
-		else if(cur.map[i][j]=='$') {
+		else if(cur[thr].map[i][j]=='$') {
 			if(info.smap[i][j]!='.') badblock++;
 		} else continue;
 		if(info.smap[i+1][j]=='#');
-		else if(cur.map[i+1][j]=='$') {
+		else if(cur[thr].map[i+1][j]=='$') {
 			if(info.smap[i+1][j]!='.') badblock++;
 		} else continue;
 		if(info.smap[i][j+1]=='#');
-		else if(cur.map[i][j+1]=='$') {
+		else if(cur[thr].map[i][j+1]=='$') {
 			if(info.smap[i][j+1]!='.') badblock++;
 		} else continue;
 		if(info.smap[i+1][j+1]=='#');
-		else if(cur.map[i+1][j+1]=='$') {
+		else if(cur[thr].map[i+1][j+1]=='$') {
 			if(info.smap[i+1][j+1]!='.') badblock++;
 		} else continue;
 		if(badblock) return 1;
@@ -504,14 +510,14 @@ static int bad2x2v2() {
 */
 /* TODO can optimize further by precalculating a list of (x,y) coordinates
    where this wall pattern occurs, and check only these */
-static int badnhor1() {
+static int badnhor1(int thr) {
 	for(int i=0;i<info.x-2;i++) for(int j=0;j<info.y-1;j++) {
 		/* walls not in place, deadlock not possible */
 		if(info.smap[i][j]!='#' || info.smap[i+2][j+1]!='#') continue;
 		/* blocks not in place, deadlock not possible */
 		/* if any of there were walls, the block would be on a dead space and
 		   the state would be rejected earlier */
-		if(cur.map[i+1][j]!='$' || cur.map[i+1][j+1]!='$') continue;
+		if(cur[thr].map[i+1][j]!='$' || cur[thr].map[i+1][j+1]!='$') continue;
 		/* reject if one of the blocks is not on goal */
 		if(info.smap[i+1][j]!='.' || info.smap[i+1][j+1]!='.') return 1;
 	}
@@ -521,14 +527,14 @@ static int badnhor1() {
 /* check for  $#
              #$
 */
-static int badnhor2() {
+static int badnhor2(int thr) {
 	for(int i=0;i<info.x-2;i++) for(int j=0;j<info.y-1;j++) {
 		/* walls not in place, deadlock not possible */
 		if(info.smap[i][j+1]!='#' || info.smap[i+2][j]!='#') continue;
 		/* blocks not in place, deadlock not possible */
 		/* if any of there were walls, the block would be on a dead space and
 		   the state would be rejected earlier */
-		if(cur.map[i+1][j]!='$' || cur.map[i+1][j+1]!='$') continue;
+		if(cur[thr].map[i+1][j]!='$' || cur[thr].map[i+1][j+1]!='$') continue;
 		/* reject if one of the blocks is not on goal */
 		if(info.smap[i+1][j]!='.' || info.smap[i+1][j+1]!='.') return 1;
 	}
@@ -539,14 +545,14 @@ static int badnhor2() {
              $$
               #
 */
-static int badnver1() {
+static int badnver1(int thr) {
 	for(int i=0;i<info.x-1;i++) for(int j=0;j<info.y-2;j++) {
 		/* walls not in place, deadlock not possible */
 		if(info.smap[i][j]!='#' || info.smap[i+1][j+2]!='#') continue;
 		/* blocks not in place, deadlock not possible */
 		/* if any of there were walls, the block would be on a dead space and
 		   the state would be rejected earlier */
-		if(cur.map[i][j+1]!='$' || cur.map[i+1][j+1]!='$') continue;
+		if(cur[thr].map[i][j+1]!='$' || cur[thr].map[i+1][j+1]!='$') continue;
 		/* reject if one of the blocks is not on goal */
 		if(info.smap[i][j+1]!='.' || info.smap[i+1][j+1]!='.') return 1;
 	}
@@ -557,21 +563,21 @@ static int badnver1() {
              $$
              #
 */
-static int badnver2() {
+static int badnver2(int thr) {
 	for(int i=0;i<info.x-1;i++) for(int j=0;j<info.y-2;j++) {
 		/* walls not in place, deadlock not possible */
 		if(info.smap[i+1][j]!='#' || info.smap[i][j+2]!='#') continue;
 		/* blocks not in place, deadlock not possible */
 		/* if any of there were walls, the block would be on a dead space and
 		   the state would be rejected earlier */
-		if(cur.map[i][j+1]!='$' || cur.map[i+1][j+1]!='$') continue;
+		if(cur[thr].map[i][j+1]!='$' || cur[thr].map[i+1][j+1]!='$') continue;
 		/* reject if one of the blocks is not on goal */
 		if(info.smap[i][j+1]!='.' || info.smap[i+1][j+1]!='.') return 1;
 	}
 	return 0;
 }
 
-static int hasgoaldeadlock() {
+static int hasgoaldeadlock(int thr) {
 	if(!info.hascorridor) return 0;
 	/* count number of blocks */
 	int x2=info.corridorx,y2=info.corridory;
@@ -581,90 +587,90 @@ static int hasgoaldeadlock() {
 	   i believe this is sufficient to catch all goal deadlocks and
 	   inefficiencies */
 	for(int i=0;i<len-2;i++) {
-		if(cur.map[x2+(i+0)*dx[d]][y2+(i+0)*dy[d]]==' ' &&
-		   cur.map[x2+(i+1)*dx[d]][y2+(i+1)*dy[d]]=='$' &&
-		   cur.map[x2+(i+2)*dx[d]][y2+(i+2)*dy[d]]==' ') return 1;
+		if(cur[thr].map[x2+(i+0)*dx[d]][y2+(i+0)*dy[d]]==' ' &&
+		   cur[thr].map[x2+(i+1)*dx[d]][y2+(i+1)*dy[d]]=='$' &&
+		   cur[thr].map[x2+(i+2)*dx[d]][y2+(i+2)*dy[d]]==' ') return 1;
 	}
 	return 0;
 }
 
-static int deadpos2() {
+static int deadpos2(int thr) {
 	/* check for 2x2 configurations of wall/block where >=1 block is not on goal */
-	if(bad2x2v2()) return 1;
+	if(bad2x2v2(thr)) return 1;
 	/* check for N-pattern */
 	if(!options.skipndeadlock) {
-		if(badnhor1()) return 1;
-		if(badnhor2()) return 1;
-		if(badnver1()) return 1;
-		if(badnver2()) return 1;
+		if(badnhor1(thr)) return 1;
+		if(badnhor2(thr)) return 1;
+		if(badnver1(thr)) return 1;
+		if(badnver2(thr)) return 1;
 	}
 	/* check for blocks not pushed fully in the goal corridor */
 	if(!options.skipgoaldeadlock) {
-		if(hasgoaldeadlock()) return 1;
+		if(hasgoaldeadlock(thr)) return 1;
 	}
 	return 0;
 }
 
-void visit_neighbours() {
-	int cx=0,cy=0,i,j,d,x2,y2,x3,y3,olddir=cur.playerdir,dl,dr;
+void visit_neighbours(int thr) {
+	int cx=0,cy=0,i,j,d,x2,y2,x3,y3,olddir=cur[thr].playerdir,dl,dr;
 	int x2a,x2aa,y2a,y2aa;
 	/* find man */
-	for(i=0;i<info.x;i++) for(j=0;j<info.y;j++) if(cur.map[i][j]=='@') cx=i,cy=j;
+	for(i=0;i<info.x;i++) for(j=0;j<info.y;j++) if(cur[thr].map[i][j]=='@') cx=i,cy=j;
 	for(d=0;d<4;d++) {
 		dl=(d+3)&3; dr=(d+1)&3;
-		cur.playerdir=d;
+		cur[thr].playerdir=d;
 		x2=cx+dx[d]; y2=cy+dy[d];
 		if(x2<0 || y2<0 || x2>=info.x || y2>=info.y || info.smap[x2][y2]=='#') continue;
-		if(cur.map[x2][y2]==' ') {
+		if(cur[thr].map[x2][y2]==' ') {
 			/* move man */
-			cur.map[cx][cy]=' ';
-			cur.map[x2][y2]='@';
-			if(!deadpos2()) add_child(encode_state());
+			cur[thr].map[cx][cy]=' ';
+			cur[thr].map[x2][y2]='@';
+			if(!deadpos2(thr)) add_child(encode_state(thr),thr);
 			/* block slap left */
 			x2a=cx+dx[dl]; y2a=cy+dy[dl];
 			x2aa=x2a+dx[dl]; y2aa=y2a+dy[dl];
-			if(olddir==d && x2aa>-1 && x2aa<info.x && y2aa>-1 && y2aa<info.y && cur.map[x2a][y2a]=='$' && cur.map[x2aa][y2aa]==' ' && info.smap[x2aa][y2aa]!='d') {
-				cur.map[x2a][y2a]=' '; cur.map[x2aa][y2aa]='$';
-				if(!deadpos2()) add_child(encode_state());
-				cur.map[x2a][y2a]='$'; cur.map[x2aa][y2aa]=' ';
+			if(olddir==d && x2aa>-1 && x2aa<info.x && y2aa>-1 && y2aa<info.y && cur[thr].map[x2a][y2a]=='$' && cur[thr].map[x2aa][y2aa]==' ' && info.smap[x2aa][y2aa]!='d') {
+				cur[thr].map[x2a][y2a]=' '; cur[thr].map[x2aa][y2aa]='$';
+				if(!deadpos2(thr)) add_child(encode_state(thr),thr);
+				cur[thr].map[x2a][y2a]='$'; cur[thr].map[x2aa][y2aa]=' ';
 			}
 			/* block slap right */
 			x2a=cx+dx[dr]; y2a=cy+dy[dr];
 			x2aa=x2a+dx[dr]; y2aa=y2a+dy[dr];
-			if(olddir==d && x2aa>-1 && x2aa<info.x && y2aa>-1 && y2aa<info.y && cur.map[x2a][y2a]=='$' && cur.map[x2aa][y2aa]==' ' && info.smap[x2aa][y2aa]!='d') {
-				cur.map[x2a][y2a]=' '; cur.map[x2aa][y2aa]='$';
-				if(!deadpos2()) add_child(encode_state());
-				cur.map[x2a][y2a]='$'; cur.map[x2aa][y2aa]=' ';
+			if(olddir==d && x2aa>-1 && x2aa<info.x && y2aa>-1 && y2aa<info.y && cur[thr].map[x2a][y2a]=='$' && cur[thr].map[x2aa][y2aa]==' ' && info.smap[x2aa][y2aa]!='d') {
+				cur[thr].map[x2a][y2a]=' '; cur[thr].map[x2aa][y2aa]='$';
+				if(!deadpos2(thr)) add_child(encode_state(thr),thr);
+				cur[thr].map[x2a][y2a]='$'; cur[thr].map[x2aa][y2aa]=' ';
 			}
-			cur.map[cx][cy]='@';
-			cur.map[x2][y2]=' ';
-		} else if(cur.map[x2][y2]=='$') {
+			cur[thr].map[cx][cy]='@';
+			cur[thr].map[x2][y2]=' ';
+		} else if(cur[thr].map[x2][y2]=='$') {
 			x3=x2+dx[d]; y3=y2+dy[d];
-			if(x3<0 || y3<0 || x3>=info.x || y3>=info.y || info.smap[x3][y3]=='#' || info.smap[x3][y3]=='d' || cur.map[x3][y3]!=' ') continue;
+			if(x3<0 || y3<0 || x3>=info.x || y3>=info.y || info.smap[x3][y3]=='#' || info.smap[x3][y3]=='d' || cur[thr].map[x3][y3]!=' ') continue;
 			/* push block */
-			cur.map[cx][cy]=' ';
-			cur.map[x2][y2]='@';
-			cur.map[x3][y3]='$';
-			if(!deadpos2()) add_child(encode_state());
+			cur[thr].map[cx][cy]=' ';
+			cur[thr].map[x2][y2]='@';
+			cur[thr].map[x3][y3]='$';
+			if(!deadpos2(thr)) add_child(encode_state(thr),thr);
 			/* block slap left */
 			x2a=cx+dx[dl]; y2a=cy+dy[dl];
 			x2aa=x2a+dx[dl]; y2aa=y2a+dy[dl];
-			if(olddir==d && x2aa>-1 && x2aa<info.x && y2aa>-1 && y2aa<info.y && cur.map[x2a][y2a]=='$' && cur.map[x2aa][y2aa]==' ' && info.smap[x2aa][y2aa]!='d') {
-				cur.map[x2a][y2a]=' '; cur.map[x2aa][y2aa]='$';
-				if(!deadpos2()) add_child(encode_state());
-				cur.map[x2a][y2a]='$'; cur.map[x2aa][y2aa]=' ';
+			if(olddir==d && x2aa>-1 && x2aa<info.x && y2aa>-1 && y2aa<info.y && cur[thr].map[x2a][y2a]=='$' && cur[thr].map[x2aa][y2aa]==' ' && info.smap[x2aa][y2aa]!='d') {
+				cur[thr].map[x2a][y2a]=' '; cur[thr].map[x2aa][y2aa]='$';
+				if(!deadpos2(thr)) add_child(encode_state(thr),thr);
+				cur[thr].map[x2a][y2a]='$'; cur[thr].map[x2aa][y2aa]=' ';
 			}
 			/* block slap right */
 			x2a=cx+dx[dr]; y2a=cy+dy[dr];
 			x2aa=x2a+dx[dr]; y2aa=y2a+dy[dr];
-			if(olddir==d && x2aa>-1 && x2aa<info.x && y2aa>-1 && y2aa<info.y && cur.map[x2a][y2a]=='$' && cur.map[x2aa][y2aa]==' ' && info.smap[x2aa][y2aa]!='d') {
-				cur.map[x2a][y2a]=' '; cur.map[x2aa][y2aa]='$';
-				if(!deadpos2()) add_child(encode_state());
-				cur.map[x2a][y2a]='$'; cur.map[x2aa][y2aa]=' ';
+			if(olddir==d && x2aa>-1 && x2aa<info.x && y2aa>-1 && y2aa<info.y && cur[thr].map[x2a][y2a]=='$' && cur[thr].map[x2aa][y2aa]==' ' && info.smap[x2aa][y2aa]!='d') {
+				cur[thr].map[x2a][y2a]=' '; cur[thr].map[x2aa][y2aa]='$';
+				if(!deadpos2(thr)) add_child(encode_state(thr),thr);
+				cur[thr].map[x2a][y2a]='$'; cur[thr].map[x2aa][y2aa]=' ';
 			}
-			cur.map[cx][cy]='@';
-			cur.map[x2][y2]='$';
-			cur.map[x3][y3]=' ';
+			cur[thr].map[cx][cy]='@';
+			cur[thr].map[x2][y2]='$';
+			cur[thr].map[x3][y3]=' ';
 		}
 	}
 }
