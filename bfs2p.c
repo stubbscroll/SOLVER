@@ -315,7 +315,7 @@ static void solver_bfs_p() {
 	pthread_mutex_init(&mutex_bfsq,NULL);
 	pthread_mutex_init(&mutex_flush,NULL);
 	pthread_mutex_init(&mutex_solution,NULL);
-	pthread_barrier_init(&barrier,NULL,threads);
+	pthread_barrier_init(&barrier,NULL,threads+1);
 	pthread_t t[MAXTHR];
 	for(int i=1;i<=threads;i++) {
 		// maybe overly conservative way of passing id, but whatever
