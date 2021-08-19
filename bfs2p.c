@@ -181,9 +181,6 @@ static void showsolution() {
 			if(got!=grab) error("read error");
 			len-=grab;
 			for(long long at=0;at<grab;at+=bfs.slen) {
-				// TODO
-				// have each thread read the next item on their own, mutex on queue
-				// pointer and some kind of signal when the previous state is found
 				decode_state(bfs.b1+at,0);
 				bfs.foundback=0;
 				visit_neighbours(0);
@@ -237,7 +234,6 @@ void add_child(unsigned char *p,int thr) {
 
 static int pid[MAXTHR];
 
-static long long bfs_at;            // position in current chunk
 static long long bfs_grab;          // number of elements in current chunk
 static pthread_mutex_t mutex_bfsq;  // mutex on bfs queue pointer
 static pthread_barrier_t barrier;
@@ -246,18 +242,16 @@ static pthread_barrier_t barrier;
 static void *solver_bfs_worker(void *ptr) {
 	int thr=*((int *)ptr);
 	while(!solution_found) {
+		// divide queue between threads, remove need for mutex
+		long long bfs_at_local=(thr-1)*bfs.slen;
 		// wait for start of next chunk
 		pthread_barrier_wait(&barrier);
 		// loop during current chunk
 		while(1) {
 			// poll queue
-			pthread_mutex_lock(&mutex_bfsq);
-			if(bfs_at<bfs_grab && !solution_found) {
-				long long at=bfs_at;
-				bfs_at+=bfs.slen;
-				// new state popped, can't be interfered with, safe to free mutex
-				pthread_mutex_unlock(&mutex_bfsq);
-				decode_state(bfs.b1+at,thr);
+			if(bfs_at_local<bfs_grab && !solution_found) {
+				decode_state(bfs.b1+bfs_at_local,thr);
+				bfs_at_local+=bfs.slen*(threads-1);
 				visit_neighbours(thr);
 			} else {
 				pthread_mutex_unlock(&mutex_bfsq);
@@ -315,7 +309,6 @@ static void solver_bfs_p() {
 			long long got=fread(bfs.b1,1,grab,f);
 			if(got!=grab) error("read error");
 			len-=grab;
-			bfs_at=0;
 			bfs_grab=grab;
 			// start workers
 			pthread_barrier_wait(&barrier);
@@ -339,7 +332,7 @@ static void usage() {
 	puts("bfs2p by stubbscroll in 2021\n");
 	puts("usage: bfs2p t [[a] b] < file.txt");
 	puts("where t is the number of threads (1 master thread and t-1 worker threads)");
-	puts("      a is the number of megabytes allocated for incoming states (default 50)");
+	puts("      a is the number of megabytes allocated for incoming states (default 400)");
 	puts("      b is the number of megabytes allocated for outgoing states (default 50)");
 	puts("      file.txt is the puzzle to be solved");
 	puts("temp files with names GEN-xxxx will be created in the current directory");
@@ -347,7 +340,7 @@ static void usage() {
 }
 
 int main(int argc,char **argv) {
-	int ram1=50,ram2=50;
+	int ram1=400,ram2=50;
 	if(argc<2) usage();
 	else if(argc==3) ram2=strtol(argv[2],0,10);
 	else if(argc>3) ram1=strtol(argv[2],0,10),ram2=strtol(argv[3],0,10);

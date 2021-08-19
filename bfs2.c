@@ -177,7 +177,7 @@ static void showsolution() {
 	// memory stats
 	long long used=0;
 	for(int i=0;i<bfs.chunks;i++) if(bfs.visited[i]) used++;
-	printf("lazy allocation: %lld of %lld sub-arrays touched\n",used,bfs.chunks);
+	printf("lazy allocation: %lld of %lld (%.6f) sub-arrays touched\n",used,bfs.chunks,(double)used/bfs.chunks);
 	printf("we won! solution steps (in reverse):\n");
 	printf("move %d\n",bfs.gen+1);
 	print_state(0);
