@@ -338,7 +338,6 @@ void domain_init() {
 		if(cur[0].map[i][j]=='@') men++;
 		if(cur[0].map[i][j]=='$') info.blocks++;
 	}
-	printf("%d live floor, %d floor, %d blocks, %d goals\n",info.lfloor,info.floor,info.blocks,goals);
 	if(men!=1) error("map must contain 1 man");
 	if(goals!=info.blocks) error("map must contain same number of blocks and destinations");
 	if(!goals) error("map must contain at least 1 block");
@@ -611,13 +610,26 @@ static int deadpos2(int thr) {
 	return 0;
 }
 
+// cx,cy: position where man is moving from
+// d: direction where man is headed
+static void blockslap(int cx,int cy,int d,int thr) {
+	for(int dd=1;dd<=3;dd+=2) {
+		int dl=(d+dd)&3;
+		int x2a=cx+dx[dl],y2a=cy+dy[dl];
+		int x2aa=x2a+dx[dl],y2aa=y2a+dy[dl];
+		if(x2aa>-1 && x2aa<info.x && y2aa>-1 && y2aa<info.y && cur[thr].map[x2a][y2a]=='$' && cur[thr].map[x2aa][y2aa]==' ' && info.smap[x2aa][y2aa]!='d') {
+			cur[thr].map[x2a][y2a]=' '; cur[thr].map[x2aa][y2aa]='$';
+			if(!deadpos2(thr)) add_child(encode_state(thr),thr);
+			cur[thr].map[x2a][y2a]='$'; cur[thr].map[x2aa][y2aa]=' ';
+		}
+	}
+}
+
 void visit_neighbours(int thr) {
-	int cx=0,cy=0,i,j,d,x2,y2,x3,y3,olddir=cur[thr].playerdir,dl,dr;
-	int x2a,x2aa,y2a,y2aa;
+	int cx=0,cy=0,i,j,d,x2,y2,x3,y3,olddir=cur[thr].playerdir;
 	/* find man */
 	for(i=0;i<info.x;i++) for(j=0;j<info.y;j++) if(cur[thr].map[i][j]=='@') cx=i,cy=j;
 	for(d=0;d<4;d++) {
-		dl=(d+3)&3; dr=(d+1)&3;
 		cur[thr].playerdir=d;
 		x2=cx+dx[d]; y2=cy+dy[d];
 		if(x2<0 || y2<0 || x2>=info.x || y2>=info.y || info.smap[x2][y2]=='#') continue;
@@ -626,22 +638,7 @@ void visit_neighbours(int thr) {
 			cur[thr].map[cx][cy]=' ';
 			cur[thr].map[x2][y2]='@';
 			if(!deadpos2(thr)) add_child(encode_state(thr),thr);
-			/* block slap left */
-			x2a=cx+dx[dl]; y2a=cy+dy[dl];
-			x2aa=x2a+dx[dl]; y2aa=y2a+dy[dl];
-			if(olddir==d && x2aa>-1 && x2aa<info.x && y2aa>-1 && y2aa<info.y && cur[thr].map[x2a][y2a]=='$' && cur[thr].map[x2aa][y2aa]==' ' && info.smap[x2aa][y2aa]!='d') {
-				cur[thr].map[x2a][y2a]=' '; cur[thr].map[x2aa][y2aa]='$';
-				if(!deadpos2(thr)) add_child(encode_state(thr),thr);
-				cur[thr].map[x2a][y2a]='$'; cur[thr].map[x2aa][y2aa]=' ';
-			}
-			/* block slap right */
-			x2a=cx+dx[dr]; y2a=cy+dy[dr];
-			x2aa=x2a+dx[dr]; y2aa=y2a+dy[dr];
-			if(olddir==d && x2aa>-1 && x2aa<info.x && y2aa>-1 && y2aa<info.y && cur[thr].map[x2a][y2a]=='$' && cur[thr].map[x2aa][y2aa]==' ' && info.smap[x2aa][y2aa]!='d') {
-				cur[thr].map[x2a][y2a]=' '; cur[thr].map[x2aa][y2aa]='$';
-				if(!deadpos2(thr)) add_child(encode_state(thr),thr);
-				cur[thr].map[x2a][y2a]='$'; cur[thr].map[x2aa][y2aa]=' ';
-			}
+			if(olddir==d) blockslap(cx,cy,d,thr);
 			cur[thr].map[cx][cy]='@';
 			cur[thr].map[x2][y2]=' ';
 		} else if(cur[thr].map[x2][y2]=='$') {
@@ -652,22 +649,7 @@ void visit_neighbours(int thr) {
 			cur[thr].map[x2][y2]='@';
 			cur[thr].map[x3][y3]='$';
 			if(!deadpos2(thr)) add_child(encode_state(thr),thr);
-			/* block slap left */
-			x2a=cx+dx[dl]; y2a=cy+dy[dl];
-			x2aa=x2a+dx[dl]; y2aa=y2a+dy[dl];
-			if(olddir==d && x2aa>-1 && x2aa<info.x && y2aa>-1 && y2aa<info.y && cur[thr].map[x2a][y2a]=='$' && cur[thr].map[x2aa][y2aa]==' ' && info.smap[x2aa][y2aa]!='d') {
-				cur[thr].map[x2a][y2a]=' '; cur[thr].map[x2aa][y2aa]='$';
-				if(!deadpos2(thr)) add_child(encode_state(thr),thr);
-				cur[thr].map[x2a][y2a]='$'; cur[thr].map[x2aa][y2aa]=' ';
-			}
-			/* block slap right */
-			x2a=cx+dx[dr]; y2a=cy+dy[dr];
-			x2aa=x2a+dx[dr]; y2aa=y2a+dy[dr];
-			if(olddir==d && x2aa>-1 && x2aa<info.x && y2aa>-1 && y2aa<info.y && cur[thr].map[x2a][y2a]=='$' && cur[thr].map[x2aa][y2aa]==' ' && info.smap[x2aa][y2aa]!='d') {
-				cur[thr].map[x2a][y2a]=' '; cur[thr].map[x2aa][y2aa]='$';
-				if(!deadpos2(thr)) add_child(encode_state(thr),thr);
-				cur[thr].map[x2a][y2a]='$'; cur[thr].map[x2aa][y2aa]=' ';
-			}
+			if(olddir==d) blockslap(cx,cy,d,thr);
 			cur[thr].map[cx][cy]='@';
 			cur[thr].map[x2][y2]='$';
 			cur[thr].map[x3][y3]=' ';

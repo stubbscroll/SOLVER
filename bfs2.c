@@ -20,8 +20,10 @@
      it's painful to implement (especially the backwards move generator, which
      is pointless otherwise)
    usage:
-   - solver a b < file.txt OR
-     solver b < file.txt, where
+   - solver m a b < file.txt OR
+   - solver m b < file.txt OR
+     solver m < file.txt, where
+     2^m is the size of each allocation unit (m=0: 1 unit for entire bit array)
      a is megabytes allocated for incoming states (can be small)
      b is megabytes allocated for outgoing states (huge is good)
      file.txt is the level to be solved
@@ -47,8 +49,12 @@
 
 static struct bfs_s {
 	long long n;                       /* number of states */
-	unsigned char *visited;            /* bitmask of visited states */
+
+	unsigned char **visited;           // pointer to pointers to visited states
 	long long visitedsize;             /* number of bytes in bitmask */
+	long long blocksize;               // number of bits in each sub-block
+	int blockb;                        // number of bits in sub-block size
+	long long chunks;                  // number of sub-blocks in **visited
 
 	unsigned char *b1;                 /* memory area: read states from */
 	unsigned char *b2;                 /* memory area: write states to */
@@ -82,8 +88,22 @@ static void copypos(unsigned char *to,unsigned char *from) {
 	memcpy(to,from,bfs.slen);
 }
 
-#define ISVISITED(state) (bfs.visited[(state)>>3]&(1<<((state)&7)))
-#define SETVISITED(state) bfs.visited[(state)>>3]|=((1<<((state)&7)))
+int isvisited(long long state) {
+	unsigned long long blockno=state>>bfs.blockb;
+	unsigned char *ptr=bfs.visited[blockno];
+	if(!ptr) return 0; // block not allocated => state not visited
+	return bfs.visited[blockno][(state&(bfs.blocksize-1))>>3]&(1<<((state&(bfs.blocksize-1))&7));
+}
+
+void setvisited(long long state) {
+	unsigned long long blockno=state>>bfs.blockb;
+	unsigned char *ptr=bfs.visited[blockno];
+	if(!ptr) {
+		if(!(bfs.visited[blockno]=calloc((bfs.blocksize+7)/8,1))) error("error allocating newly encountered sub-block");
+		ptr=bfs.visited[blockno];
+	}
+	bfs.visited[blockno][(state&(bfs.blocksize-1))>>3]|=((1<<((state&(bfs.blocksize-1)&7))));
+}
 
 /* this is supposed to work in linux too */
 /* return file size, or -1 if failed */
@@ -116,7 +136,16 @@ static void solver_init() {
 	bfs.n=getval(domain_size())+1;
 	if(bfs.n==0 || bfs.n>=(1ULL<<60)-1) error("state space too large (more than 2^60 states)");
 	bfs.visitedsize=(bfs.n+7)/8;
-	if(!(bfs.visited=calloc(bfs.visitedsize,1))) error("out of memory allocating state space bitmask");
+	// break down bit array into smaller sub-blocks (blocksize)
+	if(!bfs.blocksize) {
+		bfs.blocksize=1;
+		bfs.blockb=0;
+		while(bfs.blocksize<bfs.n) bfs.blocksize*=2,bfs.blockb++;
+	}
+	bfs.chunks=(bfs.n+bfs.blocksize-1)/bfs.blocksize;
+	if(!(bfs.visited=malloc(bfs.chunks*sizeof(void *)))) error("out of memory allocating array to bitarrays");
+	// mark each chunk as not allocated (not sure if calloc was safe here)
+	for(int i=0;i<bfs.chunks;i++) bfs.visited[i]=NULL;
 	if(!(bfs.b1=malloc(bfs.b1len))) error("out of memory allocating memory area 1");
 	if(!(bfs.b2=malloc(bfs.b2len))) error("out of memory allocating memory area 2");
 	bfs.outputmode=0;
@@ -145,6 +174,10 @@ static void flushcur() {
 
 static void showsolution() {
 	bfs.outputstate=getval(encode_state(0));
+	// memory stats
+	long long used=0;
+	for(int i=0;i<bfs.chunks;i++) if(bfs.visited[i]) used++;
+	printf("lazy allocation: %lld of %lld sub-arrays touched\n",used,bfs.chunks);
 	printf("we won! solution steps (in reverse):\n");
 	printf("move %d\n",bfs.gen+1);
 	print_state(0);
@@ -185,8 +218,8 @@ static void showsolution() {
 void add_child(unsigned char *p,int thr) {
 	if(!bfs.outputmode) {
 		unsigned long long state=getval(p);
-		if(ISVISITED(state)) return;
-		SETVISITED(state);
+		if(isvisited(state)) return;
+		setvisited(state);
 		if(won(thr)) showsolution();
 		if(bfs.cure==bfs.b2len) flushcur();
 		copypos(bfs.b2+bfs.cure,p);
@@ -200,7 +233,7 @@ void add_child(unsigned char *p,int thr) {
 static void solver_bfs() {
 	/* save initial state to disk as iteration (generation) 0 */
 	copypos(bfs.b2,encode_state(0));
-	SETVISITED(getval(encode_state(0)));
+	setvisited(getval(encode_state(0)));
 	bfs.cure=bfs.slen;
 	bfs.gen=-1;
 	createnewgenfile(0);
@@ -235,11 +268,15 @@ static void solver_bfs() {
 }
 
 int main(int argc,char **argv) {
-	int ram1=50,ram2=50;
-	if(argc==2) ram2=strtol(argv[1],0,10);
-	else if(argc>2) ram1=strtol(argv[1],0,10),ram2=strtol(argv[2],0,10);
+	int ram1=50,ram2=50,m=16;
+	if(argc==2) m=strtol(argv[1],0,10);
+	if(argc==3) m=strtol(argv[1],0,10),ram2=strtol(argv[2],0,10);
+	else if(argc>3) m=strtol(argv[1],0,10),ram1=strtol(argv[2],0,10),ram2=strtol(argv[3],0,10);
 	bfs.b1len=ram1*1048576LL;
 	bfs.b2len=ram2*1048576LL;
+	bfs.blockb=m;
+	if(m==0) bfs.blocksize=0,bfs.blockb=0;
+	else bfs.blocksize=1LL<<m;
 	domain_init();
 	solver_init();
 	solver_bfs();

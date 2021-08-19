@@ -82,42 +82,42 @@ static unsigned char *getptr(statetype v,int thr) {
 
 #define MAXPASCAL 1025
 static statetype pas[MAXPASCAL][MAXPASCAL];
-static int counts[2];                      /* only floor and block */
-static int multiset[MAX*MAX];              /* current board string (permutation) */
-static int plen;                           /* number of elements in permutation */
+static int counts[MAXTHR][2];                      /* only floor and block */
+static int multiset[MAXTHR][MAX*MAX];              /* current board string (permutation) */
+static int plen[MAXTHR];                           /* number of elements in permutation */
 
 /* fast version (inline), result in res. will destroy upper,lower,i */
 #define EVAL_MULT(res,upper,lower,i,coeff,evallen) { res=1; upper=coeff[0]; lower=0; for(i=1;i<evallen;i++) upper+=coeff[i],lower+=coeff[i-1],res*=pas[upper][lower]; }
 
 /* calculate permutation rank of sequence in multiset[] */
-static statetype permrank() {
+static statetype permrank(int thr) {
 	statetype res=0,r2;
 	int i,j,k,upper,lower,left[2];
-	for(i=0;i<2;i++) left[i]=counts[i];
-	for(i=0;i<plen;i++) {
-		for(j=0;j<multiset[i];j++) if(left[j]) {
+	for(i=0;i<2;i++) left[i]=counts[thr][i];
+	for(i=0;i<plen[thr];i++) {
+		for(j=0;j<multiset[thr][i];j++) if(left[j]) {
 			left[j]--;
 			EVAL_MULT(r2,upper,lower,k,left,2);
 			res+=r2;
 			left[j]++;
 		}
-		left[multiset[i]]--;
+		left[multiset[thr][i]]--;
 	}
 	return res;
 }
 
 /* given permutation rank, return sequence in multiset[] */
-static void permunrank(statetype rank) {
+static void permunrank(statetype rank,int thr) {
 	statetype run,next,r2;
 	int i,j,upper,lower,k,left[2];
-	for(i=0;i<2;i++) left[i]=counts[i];
-	for(i=0;i<plen;i++) {
+	for(i=0;i<2;i++) left[i]=counts[thr][i];
+	for(i=0;i<plen[thr];i++) {
 		for(run=j=0;j<2;j++) if(left[j]) {
 			left[j]--;
 			EVAL_MULT(r2,upper,lower,k,left,2);
 			next=run+r2;
 			if(next>rank) {
-				multiset[i]=j,rank-=run;
+				multiset[thr][i]=j,rank-=run;
 				break;
 			}
 			left[j]++;
@@ -314,44 +314,37 @@ void print_state(int thr) {
 
 unsigned char *encode_state(int thr) {
 	statetype v=0;
-//	puts("encode start");
-//	print_state();
 	/* encode planks */
 	for(int i=1;i<MAXPL;i++) if(info.planklen[i]>0) {
-		counts[0]=counts[1]=plen=0;
+		counts[thr][0]=counts[thr][1]=plen[thr]=0;
 		for(int j=0;j<info.bridgen[i];j++) {
 			if(isbridge(cur[thr].map[info.bx[i][j]*2+dx[info.bd[i][j]]][info.by[i][j]*2+dy[info.bd[i][j]]])) {
-				multiset[plen++]=1;
-				counts[1]++;
+				multiset[thr][plen[thr]++]=1;
+				counts[thr][1]++;
 			} else {
-				multiset[plen++]=0;
-				counts[0]++;
+				multiset[thr][plen[thr]++]=0;
+				counts[thr][0]++;
 			}
 		}
 		if(i==cur[thr].inventory) {
-			multiset[plen++]=1;
-			counts[1]++;
+			multiset[thr][plen[thr]++]=1;
+			counts[thr][1]++;
 		} else {
-			multiset[plen++]=0;
-			counts[0]++;
+			multiset[thr][plen[thr]++]=0;
+			counts[thr][0]++;
 		}
-//		for(int j=0;j<plen;j++) printf("%d",multiset[j]);
-//		printf("% I64d\n",pas[plen][counts[1]]);
-		v*=pas[plen][counts[1]]; v+=permrank();
-//		printf("  v=%I64d\n",v);
+		v*=pas[plen[thr]][counts[thr][1]]; v+=permrank(thr);
 	}
 	/* man position */
 	/* TODO normalize man position with bfs/dfs (will reduce iteration size) */
 	/* TODO prioritize goal position when reachable (or won() won't work) */
 	v*=info.stumps; v+=cur[thr].manpos;
 	if(v>=info.dsize) printf("sanity error, state value exceeds state space size\n");
-//	printf("encode %I64d\n",v);
 	return getptr(v,thr);
 }
 
 void decode_state(unsigned char *p,int thr) {
 	statetype v=getval(p);
-//	printf("decode %I64d\n",v);
 	cur[thr].inventory=0;
 	/* erase all planks from ascii map */
 	for(int i=0;i<info.x*2-1;i++) for(int j=0;j<info.y*2-1;j++) {
@@ -360,24 +353,18 @@ void decode_state(unsigned char *p,int thr) {
 	}
 	/* man pos */
 	cur[thr].manpos=v%info.stumps; v/=info.stumps;
-//	printf("  v=%I64d\n",v);
 	/* decode planks */
 	for(int i=MAXPL-1;i;i--) if(info.planklen[i]>0) {
-		counts[0]=info.bridgen[i]+1-info.planklen[i];
-		counts[1]=info.planklen[i];
-		plen=counts[0]+counts[1];
-		permunrank(v%pas[plen][counts[1]]); v/=pas[plen][counts[1]];
-//		printf("  v=%I64d\n",v);
-//		for(int j=0;j<plen;j++) printf("%d",multiset[j]);
-//		printf("% I64d\n",pas[plen][counts[1]]);
+		counts[thr][0]=info.bridgen[i]+1-info.planklen[i];
+		counts[thr][1]=info.planklen[i];
+		plen[thr]=counts[thr][0]+counts[thr][1];
+		permunrank(v%pas[plen[thr]][counts[thr][1]],thr); v/=pas[plen[thr]][counts[thr][1]];
 		for(int j=0;j<info.bridgen[i];j++) if(multiset[j]) {
 			/* draw ascii bridge */
 			if(!drawbridge(info.bx[i][j],info.by[i][j],info.bd[i][j],thr)) puts("sanity error, overlapping bridge");
 		}
-		if(multiset[plen-1]) cur[thr].inventory=i;
+		if(multiset[thr][plen[thr]-1]) cur[thr].inventory=i;
 	}
-//	puts("decode end");
-//	print_state();
 }
 
 int won(int thr) {

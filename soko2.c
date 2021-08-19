@@ -134,42 +134,42 @@ static unsigned char *getptr(statetype v,int thr) {
 
 #define MAXPASCAL 1025
 static statetype pas[MAXPASCAL][MAXPASCAL];
-static int counts[2];                      /* only floor and block */
-static int multiset[MAX*MAX];              /* current board string (permutation) */
-static int plen;                           /* number of elements in permutation */
+static int counts[MAXTHR][2];                      /* only floor and block */
+static int multiset[MAXTHR][MAX*MAX];              /* current board string (permutation) */
+static int plen[MAXTHR];                           /* number of elements in permutation */
 
 /* fast version (inline), result in res. will destroy upper,lower,i */
 #define EVAL_MULT(res,upper,lower,i,coeff,evallen) { res=1; upper=coeff[0]; lower=0; for(i=1;i<evallen;i++) upper+=coeff[i],lower+=coeff[i-1],res*=pas[upper][lower]; }
 
 /* calculate permutation rank of sequence in multiset[] */
-static statetype permrank() {
+static statetype permrank(int thr) {
 	statetype res=0,r2;
 	int i,j,k,upper,lower,left[2];
-	for(i=0;i<2;i++) left[i]=counts[i];
-	for(i=0;i<plen;i++) {
-		for(j=0;j<multiset[i];j++) if(left[j]) {
+	for(i=0;i<2;i++) left[i]=counts[thr][i];
+	for(i=0;i<plen[thr];i++) {
+		for(j=0;j<multiset[thr][i];j++) if(left[j]) {
 			left[j]--;
 			EVAL_MULT(r2,upper,lower,k,left,2);
 			res+=r2;
 			left[j]++;
 		}
-		left[multiset[i]]--;
+		left[multiset[thr][i]]--;
 	}
 	return res;
 }
 
 /* given permutation rank, return sequence in multiset[] */
-static void permunrank(statetype rank) {
+static void permunrank(statetype rank,int thr) {
 	statetype run,next,r2;
 	int i,j,upper,lower,k,left[2];
-	for(i=0;i<2;i++) left[i]=counts[i];
-	for(i=0;i<plen;i++) {
+	for(i=0;i<2;i++) left[i]=counts[thr][i];
+	for(i=0;i<plen[thr];i++) {
 		for(run=j=0;j<2;j++) if(left[j]) {
 			left[j]--;
 			EVAL_MULT(r2,upper,lower,k,left,2);
 			next=run+r2;
 			if(next>rank) {
-				multiset[i]=j,rank-=run;
+				multiset[thr][i]=j,rank-=run;
 				break;
 			}
 			left[j]++;
@@ -385,14 +385,14 @@ unsigned char *encode_state(int thr) {
 	}
 foundman:
 	/* generate permutation for live cells only (floor and blocks) */
-	counts[0]=counts[1]=plen=0;
+	counts[thr][0]=counts[thr][1]=plen[thr]=0;
 	for(k=0;k<info.lfloor;k++) {
 		i=info.id2x[k];
 		j=info.id2y[k];
-		if(cur[thr].map[i][j]==' ' || cur[thr].map[i][j]=='@') counts[0]++,multiset[plen++]=0;
-		else if(cur[thr].map[i][j]=='$') counts[1]++,multiset[plen++]=1;
+		if(cur[thr].map[i][j]==' ' || cur[thr].map[i][j]=='@') counts[thr][0]++,multiset[thr][plen[thr]++]=0;
+		else if(cur[thr].map[i][j]=='$') counts[thr][1]++,multiset[thr][plen[thr]++]=1;
 	}
-	v+=permrank()*(info.floor-info.blocks);
+	v+=permrank(thr)*(info.floor-info.blocks);
 	return getptr(v,thr);
 }
 
@@ -404,14 +404,14 @@ void decode_state(unsigned char *p,int thr) {
 	/* extract man, but don't place him yet */
 	w=v%(info.floor-info.blocks); v/=(info.floor-info.blocks);
 	/* init unrank */
-	counts[0]=info.lfloor-info.blocks;
-	counts[1]=info.blocks;
-	plen=counts[0]+counts[1];
-	permunrank(v);
+	counts[thr][0]=info.lfloor-info.blocks;
+	counts[thr][1]=info.blocks;
+	plen[thr]=counts[thr][0]+counts[1][thr];
+	permunrank(v,thr);
 	for(k=l=0;k<info.lfloor;k++) {
 		i=info.id2x[k];
 		j=info.id2y[k];
-		cur[thr].map[i][j]=multiset[l++]?'$':' ';
+		cur[thr].map[i][j]=multiset[thr][l++]?'$':' ';
 	}
 	for(j=0;j<info.y;j++) for(i=0;i<info.x;i++) {
 		if(info.smap[i][j]=='#' || cur[thr].map[i][j]=='$') continue;
