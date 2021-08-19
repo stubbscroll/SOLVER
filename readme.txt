@@ -11,7 +11,8 @@ algorithms implemented:
 - bfsdu - bfs (for undirected graphs) with delayed duplicate detection
 - bfs2 - breadth-first search with disk swapping (requires bit array of state
   space in memory, but it's divided into many parts and allocated lazily)
-- bfs2p - multithreaded version of bfs2
+- bfs2p - multithreaded version of bfs2. doesn't currently scale so well
+  because all threads compete for the atomic pushing of discovered states
 
 domains implemented:
 - npuzzle (undirected, bipartite) - (mn-1)-puzzle (aka 15-puzzle)
@@ -37,9 +38,6 @@ to come later:
   involves finding a sequence of moves leading to a goal state)
 - maybe i'll write something, i think the combination of state space search,
   tight state encoding and delta compression is rather novel
-- bfs2p: change the way the worker threads read from the queue: let each worker
-  read entries == id (mod #threads), then we don't need to mutex the queue
-  pointer and each worker can have their own pointer
 - bfs2p: the routine that finds neighbouring nodes sucks for parallelization,
   rethink it
 - bfs2p: i should really do profiling to find out where the parallelization sucks
@@ -54,6 +52,12 @@ future work:
 - bfs2 is much better than bfsd, but the memory requirements are pretty hefty.
   find further improvements, that would allow us to search farther in graphs
   where most states are unreachable
+
+inspiration:
+- if you want to improve your single-agent search algorithm search skills,
+  read the papers on the 15-puzzle written by Richard Korf. they are a
+  treasure trove. also, work on other interesting projects and discover
+  surprising synergies.
 
 to compile (in windows):
 

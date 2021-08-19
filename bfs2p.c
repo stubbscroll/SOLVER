@@ -3,30 +3,31 @@
    copyright (c) 2021 by stubbscroll, under the GNU general public license v3.
    no warranty. see LICENSE.txt for details.
 */
-/* improved version of bfs.c
+/* parallel version of bfs2.c
    - supports directed graphs
    - need (#states/8) bytes for bit array of visited states, for immediate
-     duplicate check
+     duplicate check, though it's split into lazily allocated parts
    - store list of visited states for each iteration in lists that are flushed
      to disk as needed (all disk access is linear, should be fast on non-ssd)
-   - since we stored no edges, we need to do backward search used to
+   - since we don't store parent position, backward search is used to
      reconstruct the solution (much faster than the initial search since we
      don't check for duplicates)
-   - faster than bfsd, while being able to search farther (assuming we have
-     enough memory for the bit array)
-   * TODO vbyte compression can be added for less space usage
-   * TODO solution output could be made much faster by sorting each iteration,
-     and requiring each domain to have a backwards move generator. then a binary
-     search could be done within an iteration for the desired position. however,
-     it's painful to implement (especially the backwards move generator, which
-     is pointless otherwise)
+   - some potential problems for parallel speedup
+     - the queue is split equally between threads, but processing time could
+       end up being uneven. currently, a thread has to wait for other threads
+       to finish their queue before all threads are assigned a new queue
+     - all threads have to synchronize between each search iteration (so less
+       speedup for narrow and deep search trees)
+     - unavoidable atomic operations like loading/saving to disk
+     - pushing to the queue is currently atomic (TODO next thing to fix)
+   - TODO solution output isn't parallelized at all, i guess i should do it
    usage:
    - solver t a b < file.txt OR
      solver t b < file.txt OR
      solver t < file.txt, where
-     t is the number of threads (this includes the master thread)
+     t is the number of threads 
      a is megabytes allocated for incoming states (default=50 mb, should be plenty)
-     b is megabytes allocated for outgoing states (default=50 mb, should be plenty)
+     b is megabytes allocated for outgoing states per thread (default=50 mb, should be plenty)
      file.txt is the level to be solved
      i haven't measured performance yet as a function of a,b
 */
@@ -52,8 +53,12 @@
 
 static struct bfs_s {
 	long long n;                       /* number of states */
-	unsigned char *visited;            /* bitmask of visited states */
+
+	unsigned char **visited;           // pointer to pointers to visited states
 	long long visitedsize;             /* number of bytes in bitmask */
+	long long blocksize;               // number of bits in each sub-block
+	int blockb;                        // number of bits in sub-block size
+	long long chunks;                  // number of sub-blocks in **visited
 
 	unsigned char *b1;                 /* memory area: read states from */
 	unsigned char *b2;                 /* memory area: write states to */
@@ -74,6 +79,7 @@ static struct bfs_s {
 } bfs;
 
 static int threads;                // number of threads
+static pthread_mutex_t *mutex_check;
 
 static void error(char *s) { puts(s); exit(1); }
 
@@ -89,8 +95,22 @@ static void copypos(unsigned char *to,unsigned char *from) {
 	memcpy(to,from,bfs.slen);
 }
 
-#define ISVISITED(state) (bfs.visited[(state)>>3]&(1<<((state)&7)))
-#define SETVISITED(state) bfs.visited[(state)>>3]|=((1<<((state)&7)))
+int isvisited(long long state) {
+	unsigned long long blockno=state>>bfs.blockb;
+	unsigned char *ptr=bfs.visited[blockno];
+	if(!ptr) return 0; // block not allocated => state not visited
+	return bfs.visited[blockno][(state&(bfs.blocksize-1))>>3]&(1<<((state&(bfs.blocksize-1))&7));
+}
+
+void setvisited(long long state) {
+	unsigned long long blockno=state>>bfs.blockb;
+	unsigned char *ptr=bfs.visited[blockno];
+	if(!ptr) {
+		if(!(bfs.visited[blockno]=calloc((bfs.blocksize+7)/8,1))) error("error allocating newly encountered sub-block");
+		ptr=bfs.visited[blockno];
+	}
+	bfs.visited[blockno][(state&(bfs.blocksize-1))>>3]|=((1<<((state&(bfs.blocksize-1)&7))));
+}
 
 /* this is supposed to work in linux too */
 /* return file size, or -1 if failed */
@@ -123,7 +143,18 @@ static void solver_init() {
 	bfs.n=getval(domain_size())+1;
 	if(bfs.n==0 || bfs.n>=(1ULL<<60)-1) error("state space too large (more than 2^60 states)");
 	bfs.visitedsize=(bfs.n+7)/8;
-	if(!(bfs.visited=calloc(bfs.visitedsize,1))) error("out of memory allocating state space bitmask");
+	// break down bit array into smaller sub-blocks (blocksize)
+	if(!bfs.blocksize) {
+		bfs.blocksize=1;
+		bfs.blockb=0;
+		while(bfs.blocksize<bfs.n) bfs.blocksize*=2,bfs.blockb++;
+	}
+	bfs.chunks=(bfs.n+bfs.blocksize-1)/bfs.blocksize;
+	if(!(bfs.visited=malloc(bfs.chunks*sizeof(void *)))) error("out of memory allocating array to bitarrays");
+	// mark each chunk as not allocated (not sure if calloc was safe here)
+	for(int i=0;i<bfs.chunks;i++) bfs.visited[i]=NULL;
+	if(!(mutex_check=malloc(bfs.chunks*sizeof(pthread_mutex_t *)))) error("out of memory allocating array to bitarrays");
+	for(int i=0;i<bfs.chunks;i++) pthread_mutex_init(&mutex_check[i],NULL);
 	if(!(bfs.b1=malloc(bfs.b1len))) error("out of memory allocating memory area 1");
 	if(!(bfs.b2=malloc(bfs.b2len))) error("out of memory allocating memory area 2");
 	bfs.outputmode=0;
@@ -152,7 +183,6 @@ static void flushcur() {
 
 static pthread_mutex_t mutex_solution;
 static pthread_mutex_t mutex_flush; // mutex on flushing output states
-static pthread_mutex_t mutex_check;
 static int solution_found;          // win flag
 static unsigned long long win_state;
 
@@ -203,13 +233,14 @@ void add_child(unsigned char *p,int thr) {
 	if(!bfs.outputmode) {
 		if(solution_found) return;
 		unsigned long long state=getval(p); // each thread has its own p, no need to mutex
-		pthread_mutex_lock(&mutex_check);
-		if(ISVISITED(state)) {
-			pthread_mutex_unlock(&mutex_check);
+		// one mutex per sub-array
+		pthread_mutex_lock(&mutex_check[state>>bfs.blockb]);
+		if(isvisited(state)) {
+			pthread_mutex_unlock(&mutex_check[state>>bfs.blockb]);
 			return;
 		}
-		SETVISITED(state);
-		pthread_mutex_unlock(&mutex_check);
+		setvisited(state);
+		pthread_mutex_unlock(&mutex_check[state>>bfs.blockb]);
 		pthread_mutex_lock(&mutex_solution);
 		if(solution_found) {
 			pthread_mutex_unlock(&mutex_solution);
@@ -221,6 +252,8 @@ void add_child(unsigned char *p,int thr) {
 			return;
 		}
 		pthread_mutex_unlock(&mutex_solution);
+// TODO let each thread have its own output buffer, then we can avoid another
+// mutex (except for flushing to disk)
 		pthread_mutex_lock(&mutex_flush);
 		if(bfs.cure==bfs.b2len) flushcur();
 		copypos(bfs.b2+bfs.cure,p);
@@ -251,7 +284,7 @@ static void *solver_bfs_worker(void *ptr) {
 			// poll queue
 			if(bfs_at_local<bfs_grab && !solution_found) {
 				decode_state(bfs.b1+bfs_at_local,thr);
-				bfs_at_local+=bfs.slen*(threads-1);
+				bfs_at_local+=bfs.slen*threads;
 				visit_neighbours(thr);
 			} else {
 				pthread_mutex_unlock(&mutex_bfsq);
@@ -271,21 +304,20 @@ static void *solver_bfs_worker(void *ptr) {
 static void solver_bfs_p() {
 	/* save initial state to disk as iteration (generation) 0 */
 	copypos(bfs.b2,encode_state(0));
-	SETVISITED(getval(encode_state(0)));
+	setvisited(getval(encode_state(0)));
 	bfs.cure=bfs.slen;
 	bfs.gen=-1;
 	createnewgenfile(0);
 	flushcur();
 	bfs.tot=0;
 	solution_found=0;
-	// create threads-1 threads
+	// create threads
 	pthread_mutex_init(&mutex_bfsq,NULL);
 	pthread_mutex_init(&mutex_flush,NULL);
 	pthread_mutex_init(&mutex_solution,NULL);
-	pthread_mutex_init(&mutex_check,NULL);
 	pthread_barrier_init(&barrier,NULL,threads);
 	pthread_t t[MAXTHR];
-	for(int i=1;i<threads;i++) {
+	for(int i=1;i<=threads;i++) {
 		// maybe overly conservative way of passing id, but whatever
 		pid[i]=i;
 		int rc=pthread_create(&t[i],NULL,solver_bfs_worker,pid+i);
@@ -312,7 +344,7 @@ static void solver_bfs_p() {
 			bfs_grab=grab;
 			// start workers
 			pthread_barrier_wait(&barrier);
-			// wait until all workers are done with chunk
+			// wait until all workers are done with their chunk
 			pthread_barrier_wait(&barrier);
 		}
 		if(bfs.cure) flushcur();
@@ -323,29 +355,34 @@ static void solver_bfs_p() {
 	pthread_mutex_destroy(&mutex_bfsq);
 	pthread_mutex_destroy(&mutex_flush);
 	pthread_mutex_destroy(&mutex_solution);
-	pthread_mutex_destroy(&mutex_check);
+	for(int i=0;i<bfs.chunks;i++) pthread_mutex_destroy(&mutex_check[i]);
 	if(solution_found) showsolution();
 	else puts("no solution found");
 }
 
 static void usage() {
 	puts("bfs2p by stubbscroll in 2021\n");
-	puts("usage: bfs2p t [[a] b] < file.txt");
+	puts("usage: bfs2p t [m [[[a] b]] < file.txt");
 	puts("where t is the number of threads (1 master thread and t-1 worker threads)");
 	puts("      a is the number of megabytes allocated for incoming states (default 400)");
 	puts("      b is the number of megabytes allocated for outgoing states (default 50)");
+	puts("      m is the size of each subarray in bits (0=no subarrays)");
 	puts("      file.txt is the puzzle to be solved");
 	puts("temp files with names GEN-xxxx will be created in the current directory");
 	exit(0);
 }
 
 int main(int argc,char **argv) {
-	int ram1=400,ram2=50;
+	int ram1=400,ram2=50,m=20;
 	if(argc<2) usage();
-	else if(argc==3) ram2=strtol(argv[2],0,10);
-	else if(argc>3) ram1=strtol(argv[2],0,10),ram2=strtol(argv[3],0,10);
+	else if(argc==3) m=strtol(argv[2],0,10);
+	else if(argc==4) m=strtol(argv[2],0,10),ram2=strtol(argv[3],0,10);
+	else if(argc>4) m=strtol(argv[2],0,10),ram1=strtol(argv[3],0,10),ram2=strtol(argv[4],0,10);
 	threads=strtol(argv[1],0,10);
-	if(threads<2 || threads>MAXTHR) error("number of threads should be between 2 and 1000");
+	if(threads<1 || threads>=MAXTHR) error("number of threads should be between 1 and 999");
+	bfs.blockb=m;
+	if(m==0) bfs.blocksize=0,bfs.blockb=0;
+	else bfs.blocksize=1LL<<m;
 	bfs.b1len=ram1*1048576LL;
 	bfs.b2len=ram2*1048576LL;
 	domain_init();

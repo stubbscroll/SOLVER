@@ -4,11 +4,11 @@
 */
 /* improved version of bfs.c
    - supports directed graphs
-   - need (#states/8) bytes for bitmask of visited states, for immediate
-     duplicate check
+   - need (#states/8) bytes for bit array of visited states, for immediate
+     duplicate check, though it's split into lazily allocated parts
    - store list of visited states for each iteration in lists that are flushed
      to disk as needed (all disk access is linear, should be fast on non-ssd)
-   - since we stored no edges, we need to do backward search used to
+   - since we don't store parent position, backward search is used to
      reconstruct the solution (much faster than the initial search since we
      don't check for duplicates)
    - faster than bfsd, while being able to search farther (assuming we have
@@ -18,7 +18,7 @@
      and requiring each domain to have a backwards move generator. then a binary
      search could be done within an iteration for the desired position. however,
      it's painful to implement (especially the backwards move generator, which
-     is pointless otherwise)
+     is useless otherwise)
    usage:
    - solver m a b < file.txt OR
    - solver m b < file.txt OR
