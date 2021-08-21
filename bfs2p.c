@@ -61,13 +61,13 @@ static struct bfs_s {
 	long long chunks;                  // number of sub-blocks in **visited
 
 	unsigned char *b1;                 /* memory area: read states from */
-	unsigned char *b2;                 /* memory area: write states to */
+	unsigned char *b2[MAXTHR+1];       /* memory area: write states to */
 	long long b1len;                   /* length of memory area b1 in bytes */
 	long long b1slen;                  /* length of memory area b1 in states */
 	long long b2len;                   /* length of memory area b2 in bytes */
 	long long b2slen;                  /* length of memory area b2 in states */
 
-	unsigned long long cure;           /* end of current iteration (offset) */
+	unsigned long long cure[MAXTHR+1]; /* end of current iteration (offset) */
 
 	int slen;                          /* length of state in bytes */
 	int gen;                           /* iteration number */
@@ -156,7 +156,7 @@ static void solver_init() {
 	if(!(mutex_check=malloc(bfs.chunks*sizeof(pthread_mutex_t *)))) error("out of memory allocating array to bitarrays");
 	for(int i=0;i<bfs.chunks;i++) pthread_mutex_init(&mutex_check[i],NULL);
 	if(!(bfs.b1=malloc(bfs.b1len))) error("out of memory allocating memory area 1");
-	if(!(bfs.b2=malloc(bfs.b2len))) error("out of memory allocating memory area 2");
+	for(int i=1;i<=threads;i++) if(!(bfs.b2[i]=malloc(bfs.b2len))) error("out of memory allocating memory area 2");
 	bfs.outputmode=0;
 }
 
@@ -169,15 +169,15 @@ static void createnewgenfile(int gen) {
 }
 
 /* flushes currently generated states to file GEN-(gen+1) */
-static void flushcur() {
+static void flushcur(int thr) {
 	char t[100];
 	sprintf(t,"GEN-%04d",bfs.gen+1);
 	FILE *g=fopen(t,"ab");
 	if(!g) error("couldn't append to current generation file");
-	long long wrote=fwrite(bfs.b2,1,bfs.cure,g);
-	if(wrote!=bfs.cure) error("write error");
+	long long wrote=fwrite(bfs.b2[thr],1,bfs.cure[thr],g);
+	if(wrote!=bfs.cure[thr]) error("write error");
 	if(fclose(g)) error("error on appending to current generation file");
-	bfs.cure=0;
+	bfs.cure[thr]=0;
 	printf(".");fflush(stdout);
 }
 
@@ -252,13 +252,13 @@ void add_child(unsigned char *p,int thr) {
 			return;
 		}
 		pthread_mutex_unlock(&mutex_solution);
-// TODO let each thread have its own output buffer, then we can avoid another
-// mutex (except for flushing to disk)
-		pthread_mutex_lock(&mutex_flush);
-		if(bfs.cure==bfs.b2len) flushcur();
-		copypos(bfs.b2+bfs.cure,p);
-		bfs.cure+=bfs.slen;
-		pthread_mutex_unlock(&mutex_flush);
+		if(bfs.cure[thr]==bfs.b2len) {
+			pthread_mutex_lock(&mutex_flush);
+			flushcur(thr);
+			pthread_mutex_unlock(&mutex_flush);
+		}
+		copypos(bfs.b2[thr]+bfs.cure[thr],p);
+		bfs.cure[thr]+=bfs.slen;
 	} else if(bfs.outputmode && !bfs.foundback) {
 		unsigned long long state=getval(p);
 		if(state==bfs.outputstate) bfs.foundback=1;
@@ -303,12 +303,12 @@ static void *solver_bfs_worker(void *ptr) {
 // available for the worker threads
 static void solver_bfs_p() {
 	/* save initial state to disk as iteration (generation) 0 */
-	copypos(bfs.b2,encode_state(0));
+	copypos(bfs.b2[1],encode_state(0));
 	setvisited(getval(encode_state(0)));
-	bfs.cure=bfs.slen;
+	bfs.cure[1]=bfs.slen;
 	bfs.gen=-1;
 	createnewgenfile(0);
-	flushcur();
+	flushcur(1);
 	bfs.tot=0;
 	solution_found=0;
 	// create threads
@@ -332,7 +332,7 @@ static void solver_bfs_p() {
 		FILE *f=fopen(s,"rb");
 		if(!f) error("couldn't open previous gen file");
 		createnewgenfile(bfs.gen+1);
-		bfs.cure=0;
+		for(int i=1;i<=threads;i++) bfs.cure[i]=0;
 		bfs.tot+=len/bfs.slen;
 		printf("%d: q %lld tot %lld\n",bfs.gen,len/bfs.slen,bfs.tot);fflush(stdout);
 		if(!len) break;
@@ -347,7 +347,9 @@ static void solver_bfs_p() {
 			// wait until all workers are done with their chunk
 			pthread_barrier_wait(&barrier);
 		}
-		if(bfs.cure) flushcur();
+		// TODO i guess memcopying to one chunk and write in one go is slightly
+		// faster, but i doubt it will make a difference
+		for(int i=1;i<=threads;i++) if(bfs.cure[i]) flushcur(i);
 		fclose(f);
 		if(solution_found) break;
 	}

@@ -11,22 +11,22 @@ algorithms implemented:
 - bfsdu - bfs (for undirected graphs) with delayed duplicate detection
 - bfs2 - breadth-first search with disk swapping (requires bit array of state
   space in memory, but it's divided into many parts and allocated lazily)
-- bfs2p - multithreaded version of bfs2. doesn't currently scale so well
-  because all threads compete for the atomic pushing of discovered states
+- bfs2p - multithreaded version of bfs2 (speedup is not so good currently,
+  around 3-5 threads is fastest, more than that is slower)
 
 domains implemented:
 - npuzzle (undirected, bipartite) - (mn-1)-puzzle (aka 15-puzzle)
 - chip1 - sokoban with popup walls and force floors
-- soko - simple sokoban, no checking for dead states etc
-- soko2 - sokoban, checks for simple deadlocks, better encoding
-- soko3 - sokoban, same as soko2 but with block slapping (feature in chip's
-  challenge for lynx and steam)
+- soko (bipartite) - simple sokoban, no checking for dead states etc
+- soko2 (bipartite) - sokoban, checks for simple deadlocks, better encoding
+- soko-lx (bipartite) - sokoban, same as soko2 but with block slapping
+  (feature in chip's challenge for lynx and steam)
 - plank (undirected) - plank puzzle
 
 puzzle instances:
 - npuzzle/ - puzzles for n-puzzle
 - chip/ - puzzles for chip1
-- soko/ - puzzles for soko, soko2, soko3
+- soko/ - puzzles for soko, soko2, soko-lx
 - plank/ - puzzles for plank
 
 to come later:
@@ -54,10 +54,10 @@ future work:
   where most states are unreachable
 
 inspiration:
-- if you want to improve your single-agent search algorithm search skills,
-  read the papers on the 15-puzzle written by Richard Korf. they are a
-  treasure trove. also, work on other interesting projects and discover
-  surprising synergies.
+- if you want to improve your single-agent search algorithm skills,
+  read the papers on the 15-puzzle written by Richard Korf and Jonathan
+  Schaeffer. they are a treasure trove. also, work on other interesting
+  projects and discover surprising synergies.
 
 to compile (in windows):
 
