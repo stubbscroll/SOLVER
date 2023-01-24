@@ -265,7 +265,6 @@ mapended:
 		/* follow bridge and find length */
 		int len=scanbridge(i,j,d,0);
 		if(len>-1) {
-//			printf("%d %d %d: found length %d\n",i,j,d,len);
 			info.bx[len][info.bridgen[len]]=i;
 			info.by[len][info.bridgen[len]]=j;
 			info.bd[len][info.bridgen[len]++]=d;
@@ -359,7 +358,7 @@ void decode_state(unsigned char *p,int thr) {
 		counts[thr][1]=info.planklen[i];
 		plen[thr]=counts[thr][0]+counts[thr][1];
 		permunrank(v%pas[plen[thr]][counts[thr][1]],thr); v/=pas[plen[thr]][counts[thr][1]];
-		for(int j=0;j<info.bridgen[i];j++) if(multiset[j]) {
+		for(int j=0;j<info.bridgen[i];j++) if(multiset[thr][j]) {
 			/* draw ascii bridge */
 			if(!drawbridge(info.bx[i][j],info.by[i][j],info.bd[i][j],thr)) puts("sanity error, overlapping bridge");
 		}
